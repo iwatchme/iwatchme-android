@@ -17,6 +17,10 @@ android {
         testInstrumentationRunner ="androidx.test.runner.AndroidJUnitRunner"
     }
 
+    buildFeatures {
+        compose = true
+    }
+
     buildTypes {
         getByName("release") {
             isMinifyEnabled =false
@@ -30,6 +34,17 @@ android {
     kotlinOptions {
         jvmTarget = "1.8"
     }
+
+    /**
+     * https://developer.android.com/jetpack/androidx/releases/compose-kotlin
+     * compose和kotlin版本的对应关系
+     * https://www.jetpackcomposeversion.com/
+     * compose的最新版本号
+     * */
+    composeOptions {
+        kotlinCompilerExtensionVersion = "1.4.0-alpha02"
+    }
+
 }
 
 dependencies {

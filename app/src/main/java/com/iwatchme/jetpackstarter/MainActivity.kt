@@ -1,10 +1,10 @@
-package com.iwatchme.jetpackstarter.home
+package com.iwatchme.jetpackstarter
 
 import android.os.Bundle
 import androidx.appcompat.app.AppCompatActivity
-import android.widget.Button
 import androidx.activity.compose.setContent
 import androidx.compose.ui.Modifier
+import com.iwatchme.jetpackstarter.home.Home
 
 
 class MainActivity : AppCompatActivity() {
