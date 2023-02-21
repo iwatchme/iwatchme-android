@@ -39,4 +39,13 @@ dependencies {
     testImplementation(baselibs.junit)
     androidTestImplementation(baselibs.androidx.test.junit)
     androidTestImplementation(baselibs.androidx.test.espresso)
+
+
+    implementation(compose.compose.activity)
+    implementation(compose.compose.material)
+    implementation(compose.compose.material.icons.extended)
+    implementation(compose.compose.animation)
+    implementation(compose.compose.ui.tooling)
+    implementation(compose.compose.viewmodel)
+    implementation(compose.compose.navigation)
 }
