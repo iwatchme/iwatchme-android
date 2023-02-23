@@ -5,12 +5,12 @@ plugins {
 
 android {
     namespace="com.iwatchme.jetpackstarter"
-    compileSdkVersion(33)
+    compileSdk = 33
 
     defaultConfig {
         applicationId = "com.iwatchme.jetpackstarter"
-        minSdkVersion(24)
-        targetSdkVersion(33)
+        minSdk = 24
+        targetSdk = 33
         versionCode = 1
         versionName="1.0"
 
@@ -63,4 +63,11 @@ dependencies {
     implementation(compose.compose.ui.tooling)
     implementation(compose.compose.viewmodel)
     implementation(compose.compose.navigation)
+    implementation(compose.compose.foundation)
+
+    implementation(thirdparty.permission)
+    implementation(thirdparty.image)
+
+    implementation(exoplayer.exoplayer.ui)
+    implementation(exoplayer.exoplayer.core)
 }
