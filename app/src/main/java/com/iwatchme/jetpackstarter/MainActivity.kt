@@ -18,7 +18,7 @@ class MainActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
 
        setContent {
-           Gallery()
+          Inbox()
        }
 
 

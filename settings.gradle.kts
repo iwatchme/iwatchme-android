@@ -57,4 +57,3 @@ dependencyResolutionManagement {
 }
 rootProject.name = "JetpackStarter"
 include(":app")
-include(":compose")
