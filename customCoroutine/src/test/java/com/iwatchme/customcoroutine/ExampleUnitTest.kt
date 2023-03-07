@@ -1,17 +1,17 @@
 package com.iwatchme.customcoroutine
 
-import com.iwatchme.customcoroutine.coroutine.KotlinCoroutineImpl
+import com.iwatchme.customcoroutine.coroutine.CustomKotlinCoroutine
 import com.iwatchme.customcoroutine.coroutine.Logger
-import com.iwatchme.customcoroutine.coroutine.RunSuspend
 import com.iwatchme.customcoroutine.coroutine.returnImmediately
 import com.iwatchme.customcoroutine.coroutine.returnSuspend
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineExceptionHandler
-import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import org.junit.Test
+import kotlin.coroutines.Continuation
+import kotlin.coroutines.CoroutineContext
+import kotlin.coroutines.EmptyCoroutineContext
 
 /**
  * Example local unit test, which will execute on the development machine (host).
@@ -45,4 +45,31 @@ class ExampleUnitTest {
         }
 
     }
+
+    @Test
+    fun testCustomCoroutine() {
+        var isFinished = false
+        val kotlinCoroutine =
+            CustomKotlinCoroutine(object :
+                Continuation<Unit> {
+                override val context: CoroutineContext = EmptyCoroutineContext;
+
+                override fun resumeWith(result: Result<Unit>) {
+                    Logger("finish")
+                    isFinished = true
+                }
+
+            })
+        Thread.setDefaultUncaughtExceptionHandler { thread, throwable ->
+            Logger("catch: $throwable")
+        }
+
+        kotlinCoroutine.resumeWith(Any())
+        Logger("here")
+        while(!isFinished) {
+            Thread.sleep(100)
+        }
+
+    }
+
 }

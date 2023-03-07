@@ -9,12 +9,16 @@ import kotlin.coroutines.EmptyCoroutineContext;
 import kotlin.coroutines.intrinsics.IntrinsicsKt;
 import kotlinx.coroutines.DelayKt;
 
-public class KotlinCoroutineImpl implements Continuation<Object> {
+/**
+ * this is the implementation of the suspend function
+ * reference from https://github.com/Kotlin/KEEP/blob/master/proposals/coroutines.md
+ * */
+public class CustomKotlinCoroutine implements Continuation<Object> {
 
     private int label =0;
     private Continuation<Unit> completion;
 
-    public KotlinCoroutineImpl(Continuation<Unit> continuation) {
+    public CustomKotlinCoroutine(Continuation<Unit> continuation) {
         this.completion = continuation;
     }
 
