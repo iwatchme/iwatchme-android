@@ -70,4 +70,6 @@ dependencies {
 
     implementation(exoplayer.exoplayer.ui)
     implementation(exoplayer.exoplayer.core)
+
+    implementation(jetpack.startup)
 }

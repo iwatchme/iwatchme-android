@@ -25,6 +25,10 @@ dependencyResolutionManagement {
             library("androidx-test-espresso", "androidx.test.espresso:espresso-core:3.5.1")
         }
 
+        this.create("jetpack") {
+            library("startup", "androidx.startup:startup-runtime:1.1.0")
+        }
+
         this.create("compose") {
             library("compose-activity", "androidx.activity:activity-compose:1.6.0")
             library("compose-compiler", "androidx.compose.compiler:compiler:1.3.1")
@@ -58,3 +62,4 @@ dependencyResolutionManagement {
 rootProject.name = "JetpackStarter"
 include(":app")
 include(":customCoroutine")
+include(":startupLauncher")
