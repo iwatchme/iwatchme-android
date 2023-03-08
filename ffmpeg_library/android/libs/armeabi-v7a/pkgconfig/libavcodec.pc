@@ -1,0 +1,14 @@
+prefix=/Users/iwatchme/Projects/Android/JetpackStarter/ffmpeg/../ffmpeg_library/android/armeabi-v7a
+exec_prefix=${prefix}
+libdir=/Users/iwatchme/Projects/Android/JetpackStarter/ffmpeg/../ffmpeg_library/android/libs/armeabi-v7a
+includedir=/Users/iwatchme/Projects/Android/JetpackStarter/ffmpeg/../ffmpeg_library/android/armeabi-v7a/include
+
+Name: libavcodec
+Description: FFmpeg codec library
+Version: 60.6.100
+Requires: 
+Requires.private: libavutil >= 58.3.100
+Conflicts:
+Libs: -L${libdir}  -lavcodec 
+Libs.private: -landroid -pthread -lm -latomic -lz
+Cflags: -I${includedir}

@@ -1,0 +1,14 @@
+prefix=/Users/iwatchme/Projects/Android/JetpackStarter/ffmpeg/../ffmpeg_library/android/armeabi-v7a
+exec_prefix=${prefix}
+libdir=/Users/iwatchme/Projects/Android/JetpackStarter/ffmpeg/../ffmpeg_library/android/libs/armeabi-v7a
+includedir=/Users/iwatchme/Projects/Android/JetpackStarter/ffmpeg/../ffmpeg_library/android/armeabi-v7a/include
+
+Name: libswscale
+Description: FFmpeg image rescaling library
+Version: 7.2.100
+Requires: 
+Requires.private: libavutil >= 58.3.100
+Conflicts:
+Libs: -L${libdir}  -lswscale 
+Libs.private: -lm -latomic
+Cflags: -I${includedir}

@@ -1,0 +1,14 @@
+prefix=/Users/iwatchme/Projects/Android/JetpackStarter/ffmpeg/../ffmpeg_library/android/armeabi-v7a
+exec_prefix=${prefix}
+libdir=/Users/iwatchme/Projects/Android/JetpackStarter/ffmpeg/../ffmpeg_library/android/libs/armeabi-v7a
+includedir=/Users/iwatchme/Projects/Android/JetpackStarter/ffmpeg/../ffmpeg_library/android/armeabi-v7a/include
+
+Name: libavutil
+Description: FFmpeg utility library
+Version: 58.3.100
+Requires: 
+Requires.private: 
+Conflicts:
+Libs: -L${libdir}  -lavutil 
+Libs.private: -pthread -lm -latomic
+Cflags: -I${includedir}
