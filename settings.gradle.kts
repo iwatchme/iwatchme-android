@@ -9,6 +9,7 @@ dependencyResolutionManagement {
     repositories {
         google()
         mavenCentral()
+        maven { setUrl("https://jitpack.io") }
     }
 
     /**
@@ -63,3 +64,4 @@ rootProject.name = "JetpackStarter"
 include(":app")
 include(":customCoroutine")
 include(":startupLauncher")
+include(":jetpackstarterplayer")
