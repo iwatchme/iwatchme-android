@@ -24,8 +24,8 @@ extern "C"
 JNIEXPORT void JNICALL
 Java_com_iwatchme_jetpackstarterplayer_MainActivity_decodeWithPath(JNIEnv *env, jobject thiz, jstring path) {
 
-    const char *inputPath = "/sdcard/sintel.mp4";
-    const char *outputPath = "/sdcard/sintel.yuv";
+    const char *inputPath = "/storage/emulated/0/Android/data/com.iwatchme.jetpackstarterplayer/files/Movies/test.mp4";
+    const char *outputPath = "/storage/emulated/0/Android/data/com.iwatchme.jetpackstarterplayer/files/Movies/sintel.yuv";
 
     char info[40000] = {0};
     void *iter = NULL;
@@ -66,7 +66,7 @@ JNIEXPORT void JNICALL
 Java_com_iwatchme_jetpackstarterplayer_Decoder_decodeToSurface(JNIEnv *env, jobject thiz, jstring path,
                                              jobject surface) {
 
-    const char *inputPath = "/sdcard/sintel.mp4";
+    const char *inputPath = "/storage/emulated/0/Android/data/com.iwatchme.jetpackstarterplayer/files/Movies/test.mp4";
 
     FFmpegMediaCodec *mediaCodec = new FFmpegMediaCodec;
     int ret = mediaCodec->decode(inputPath, surface);

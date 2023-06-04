@@ -34,6 +34,10 @@ public class MainActivity extends AppCompatActivity {
         // Example of a call to a native method
         Button tv = findViewById(R.id.sample_text);
         tv.setText("Hello FFmpeg");
+        for (int i = 0; i < getExternalFilesDirs(Environment.DIRECTORY_MOVIES).length; i++) {
+            Log.e("Frank", "path: "+ getExternalFilesDirs(Environment.DIRECTORY_MOVIES)[i].getAbsolutePath());
+
+        }
 
         tv.setOnClickListener(new View.OnClickListener() {
             @Override

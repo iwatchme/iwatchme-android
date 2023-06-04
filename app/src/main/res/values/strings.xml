@@ -40,4 +40,9 @@
 
     <string name="permission_explainer_message">To display media we need access to the storage on your device</string>
     <string name="permission_explainer_action">Grant permission</string>
+
+
+    <string name="label_brush">Draw with brush</string>
+    <string name="label_text">Insert Text</string>
+    <string name="label_emoji">Insert emoji</string>
 </resources>

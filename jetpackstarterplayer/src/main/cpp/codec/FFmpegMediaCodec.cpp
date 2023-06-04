@@ -82,6 +82,10 @@ int FFmpegMediaCodec::decode_write(AVCodecContext *avctx, AVPacket *packet) {
         } else
             tmp_frame = frame;
 
+
+
+        LOGD("av_image_get_buffer_size: %d %d %d %d", tmp_frame->format, tmp_frame->width,
+             tmp_frame->height, 1);
         size = av_image_get_buffer_size(static_cast<AVPixelFormat>(tmp_frame->format),
                                         tmp_frame->width,
                                         tmp_frame->height, 1);
