@@ -155,7 +155,6 @@ class EditViewModel : ViewModel() {
                         thickness = event.thickness
                     )
                 )
-
             }
 
             else -> {

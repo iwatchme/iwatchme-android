@@ -8,6 +8,7 @@ import com.iwatchme.jetpackstarter.emailbox.Email
 import com.iwatchme.jetpackstarter.emailbox.Inbox
 import com.iwatchme.jetpackstarter.gallery.Gallery
 import com.iwatchme.jetpackstarter.home.Home
+import com.iwatchme.jetpackstarter.pictureEditor.Stories
 import com.iwatchme.jetpackstarter.settings.SettingsScreen
 import com.iwatchme.jetpackstarter.video.Video
 
@@ -18,7 +19,7 @@ class MainActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
 
        setContent {
-          Inbox()
+          Stories()
        }
 
 
