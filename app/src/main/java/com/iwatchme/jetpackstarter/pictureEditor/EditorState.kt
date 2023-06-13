@@ -40,7 +40,7 @@ sealed class EditorObject(val id: String? = null) {
 
 data class BrushConfiguration(
     val color: Color = Color.Black,
-    val strokeWidth: Float = 20f
+    val thickness: Float = 20f
 )
 
 

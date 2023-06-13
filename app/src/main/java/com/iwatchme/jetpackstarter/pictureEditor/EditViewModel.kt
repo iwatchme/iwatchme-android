@@ -1,6 +1,7 @@
 package com.iwatchme.jetpackstarter.pictureEditor
 
 import android.view.MotionEvent
+import androidx.compose.runtime.currentComposer
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
@@ -86,6 +87,23 @@ class EditViewModel : ViewModel() {
                                 event.event.y
                             )
                         }
+                        uiState.value = uiState.value.copy(
+                            currentDrawPath = EditorObject.BrushPath(
+                                mutableStateOf(updatedPath),
+                                brushPath.brushConfiguration
+                            )
+                        )
+                    }
+
+                    MotionEvent.ACTION_UP -> {
+                        val brushPath = (uiState.value.currentDrawPath as EditorObject.BrushPath)
+                        brushPath?.let { path ->
+                            uiState.value = uiState.value.copy(
+                                drawObject = uiState.value.drawObject + path,
+                                currentDrawPath = null
+                            )
+
+                        }
                     }
 
                 }
@@ -119,6 +137,25 @@ class EditViewModel : ViewModel() {
                             )
                         }.toList()
                 )
+            }
+
+            is EditorEvent.UpdateToolColor -> {
+                uiState.value = uiState.value.copy(
+                    currentBrushConfiguration = uiState.value.currentBrushConfiguration.copy(
+                        color = event.color
+                    )
+                )
+
+            }
+
+
+            is EditorEvent.UpdateToolThickness -> {
+                uiState.value = uiState.value.copy(
+                    currentBrushConfiguration = uiState.value.currentBrushConfiguration.copy(
+                        thickness = event.thickness
+                    )
+                )
+
             }
 
             else -> {

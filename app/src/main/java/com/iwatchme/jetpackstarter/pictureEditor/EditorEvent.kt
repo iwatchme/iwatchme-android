@@ -18,6 +18,8 @@ sealed class EditorEvent {
 
     class UpdateToolColor(val color: Color) : EditorEvent()
 
+    class UpdateToolThickness(val thickness: Float): EditorEvent()
+
     object Undo : EditorEvent()
 
     class AddText(
