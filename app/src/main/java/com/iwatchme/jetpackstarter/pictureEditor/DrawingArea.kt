@@ -14,9 +14,9 @@ import androidx.compose.ui.input.pointer.pointerInteropFilter
 @Composable
 fun DrawingArea(
     modifier: Modifier,
-    selectTool: EditorTool,
+    selectTool: EditorTool?,
     drawObjects: List<EditorObject>,
-    currentPath: EditorObject,
+    currentPath: EditorObject?,
     handleEvent: (event: EditorEvent) -> Unit
 ) {
     Canvas(modifier = modifier.pointerInteropFilter { event ->

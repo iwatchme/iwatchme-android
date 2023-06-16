@@ -49,13 +49,13 @@ sealed class EditorTool(
     val icon: ImageVector
 ) {
 
-    class TextTool : EditorTool(R.string.label_text, Icons.Default.TextFormat)
+    object TextTool : EditorTool(R.string.label_text, Icons.Default.TextFormat)
 
 
-    class BrushTool : EditorTool(R.string.label_brush, Icons.Default.Brush)
+    object BrushTool : EditorTool(R.string.label_brush, Icons.Default.Brush)
 
 
-    class EmojiTool : EditorTool(R.string.label_emoji, Icons.Default.EmojiEmotions)
+    object EmojiTool : EditorTool(R.string.label_emoji, Icons.Default.EmojiEmotions)
 
 }
 

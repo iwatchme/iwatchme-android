@@ -15,7 +15,8 @@ fun Stories() {
     MaterialTheme {
         StoriesEditor(
             modifier =  Modifier.fillMaxSize(),
-            state = viewModel.uiState.collectAsState().value
+            state = viewModel.uiState.collectAsState().value,
+            handleEvent = viewModel::handleEvent
         )
 
     }
