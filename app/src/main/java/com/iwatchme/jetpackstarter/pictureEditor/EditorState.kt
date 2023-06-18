@@ -15,7 +15,7 @@ import com.iwatchme.jetpackstarter.R
 
 data class EditorState(
     val selectTool: EditorTool? = null,
-    val drawObject: List<EditorObject> = emptyList(),
+    val drawObjects: List<EditorObject> = emptyList(),
     val currentDrawPath: EditorObject.BrushPath? = null,
     val currentBrushConfiguration: BrushConfiguration = BrushConfiguration()
 )

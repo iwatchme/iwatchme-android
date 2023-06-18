@@ -1,7 +1,6 @@
 package com.iwatchme.jetpackstarter.pictureEditor
 
 import android.view.MotionEvent
-import androidx.compose.runtime.currentComposer
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
@@ -48,14 +47,14 @@ class EditViewModel : ViewModel() {
 
                 )
                 uiState.value = uiState.value.copy(
-                    drawObject = uiState.value.drawObject + text,
+                    drawObjects = uiState.value.drawObjects + text,
                     selectTool = null
                 )
             }
 
             is EditorEvent.Undo -> {
                 uiState.value = uiState.value.copy(
-                    drawObject = uiState.value.drawObject.toMutableList().apply { removeLast() }
+                    drawObjects = uiState.value.drawObjects.toMutableList().apply { removeLast() }
                         .toList(),
                     selectTool = null
                 )
@@ -99,7 +98,7 @@ class EditViewModel : ViewModel() {
                         val brushPath = (uiState.value.currentDrawPath as EditorObject.BrushPath)
                         brushPath?.let { path ->
                             uiState.value = uiState.value.copy(
-                                drawObject = uiState.value.drawObject + path,
+                                drawObjects = uiState.value.drawObjects + path,
                                 currentDrawPath = null
                             )
 
@@ -111,20 +110,20 @@ class EditViewModel : ViewModel() {
 
             is EditorEvent.TransformObject -> {
                 val selectedObject =
-                    uiState.value.drawObject.find { it.id == event.id } as EditorObject.Text
+                    uiState.value.drawObjects.find { it.id == event.id } as EditorObject.Text
                 val scale = selectedObject.scale * (event.scale ?: 1f)
                 val rotation = selectedObject.rotation + (event.rotation ?: 1f)
                 val transformOffset = selectedObject.offset.copy(
-                    x = selectedObject.offset.x * scale,
-                    y = selectedObject.offset.y * scale
+                    x = event.offset.x * scale,
+                    y = event.offset.y * scale
                 ).rotateBy(rotation)
 
                 uiState.value = uiState.value.copy(
-                    drawObject = uiState.value.drawObject
+                    drawObjects = uiState.value.drawObjects
                         .toMutableList()
                         .apply {
                             val index = uiState.value
-                                .drawObject
+                                .drawObjects
                                 .indexOf(selectedObject)
                             val offset = selectedObject.offset.plus(transformOffset)
                             set(
