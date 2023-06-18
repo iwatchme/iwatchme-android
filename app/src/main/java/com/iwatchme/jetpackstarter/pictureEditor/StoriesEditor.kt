@@ -2,6 +2,7 @@ package com.iwatchme.jetpackstarter.pictureEditor
 
 import android.graphics.Paint
 import android.graphics.Rect
+import android.util.Log
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -13,6 +14,7 @@ import androidx.compose.material.BottomSheetValue
 import androidx.compose.material.ExperimentalMaterialApi
 import androidx.compose.material.rememberBottomSheetScaffoldState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -84,6 +86,13 @@ fun StoriesEditor(
                 contentScale = ContentScale.Crop
             )
 
+            LaunchedEffect(this.constraints, block = {
+                centerCanvas = Offset(
+                    (constraints.maxWidth / 2).toFloat(),
+                    (constraints.maxHeight / 2).toFloat()
+                )
+            })
+
 
             DrawingArea(
                 modifier = Modifier.fillMaxSize(),
@@ -127,7 +136,20 @@ fun StoriesEditor(
                 currentObject = state.currentDrawPath,
                 handleEvent = handleEvent,
                 addText = { text, color ->
-                }
+                    Rect().also { bounds ->
+                        defaultTextPaint.getTextBounds(text, 0, text.length, bounds)
+                        handleEvent(
+                            EditorEvent.AddText(
+                                centerCanvas.x,
+                                centerCanvas.y,
+                                bounds.width(),
+                                bounds.height(),
+                                text,
+                                color
+                            )
+                        )
+                    }
+                },
             )
 
         }

@@ -20,6 +20,7 @@ fun StickerArea(
 ) {
     Box(modifier = modifier) {
         drawingObjects.forEach { text ->
+            Log.e("Frank", "22: ${text.id} ${text.offset}")
             Text(
                 modifier = Modifier
                     .graphicsLayer {

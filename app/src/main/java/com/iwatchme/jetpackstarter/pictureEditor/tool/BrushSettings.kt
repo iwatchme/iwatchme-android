@@ -1,4 +1,4 @@
-package com.iwatchme.jetpackstarter.pictureEditor
+package com.iwatchme.jetpackstarter.pictureEditor.tool
 
 import androidx.compose.animation.ExperimentalAnimationApi
 import androidx.compose.foundation.layout.Column
@@ -16,6 +16,8 @@ import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import com.iwatchme.jetpackstarter.pictureEditor.BrushConfiguration
+import com.iwatchme.jetpackstarter.pictureEditor.ColorPicker
 
 @OptIn(ExperimentalAnimationApi::class)
 @Composable

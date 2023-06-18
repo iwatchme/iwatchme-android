@@ -1,5 +1,6 @@
 package com.iwatchme.jetpackstarter.pictureEditor
 
+import android.util.Log
 import android.view.MotionEvent
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.geometry.Offset
@@ -42,7 +43,7 @@ class EditViewModel : ViewModel() {
                 val text = EditorObject.Text(
                     textId = UUID.randomUUID().toString(),
                     text = event.text,
-                    offset = Offset(event.x + event.width / 2, event.y + event.height / 2),
+                    offset = Offset(event.x - event.width / 2, event.y - event.height / 2),
                     color = event.color ?: Color.Unspecified
 
                 )
@@ -56,7 +57,6 @@ class EditViewModel : ViewModel() {
                 uiState.value = uiState.value.copy(
                     drawObjects = uiState.value.drawObjects.toMutableList().apply { removeLast() }
                         .toList(),
-                    selectTool = null
                 )
             }
 

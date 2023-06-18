@@ -3,6 +3,8 @@ package com.iwatchme.jetpackstarter.pictureEditor
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import com.iwatchme.jetpackstarter.pictureEditor.tool.BrushSettings
+import com.iwatchme.jetpackstarter.pictureEditor.tool.TextSettings
 
 @Composable
 fun ToolConfig(
@@ -28,6 +30,10 @@ fun ToolConfig(
             }
         )
     } else if (selectedTool is EditorTool.TextTool) {
+        TextSettings(
+            modifier = modifier,
+            addText = addText
+        )
 
     }
 }

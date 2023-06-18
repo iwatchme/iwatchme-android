@@ -1,5 +1,6 @@
 package com.iwatchme.jetpackstarter.pictureEditor
 
+import android.util.Log
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -40,6 +41,7 @@ fun ActionsBar(
             Row(
                 modifier = Modifier.fillMaxWidth()
             ) {
+                Log.e("Frank", "111: ${drawingObjects.isNullOrEmpty()}")
                 if (!drawingObjects.isNullOrEmpty()) {
                     IconButton(onClick = {
                         handleEvent(EditorEvent.Undo)
