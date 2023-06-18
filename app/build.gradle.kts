@@ -1,6 +1,7 @@
 plugins {
     id ("com.android.application")
     id ("org.jetbrains.kotlin.android")
+    id("kotlin-parcelize")
 }
 
 android {
@@ -64,6 +65,7 @@ dependencies {
     implementation(compose.compose.viewmodel)
     implementation(compose.compose.navigation)
     implementation(compose.compose.foundation)
+    implementation(compose.compose.constraintlayout)
 
     implementation(thirdparty.permission)
     implementation(thirdparty.image)

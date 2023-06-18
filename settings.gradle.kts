@@ -46,7 +46,7 @@ dependencyResolutionManagement {
             library("compose-navigation", "androidx.navigation:navigation-compose:2.5.3")
             library("compose-viewmodel", "androidx.lifecycle:lifecycle-viewmodel-compose:2.5.1")
             library("compose-animation", "androidx.compose.animation:animation:1.3.3")
-            library("compose-constraintlayout", "androidx.constraintlayout:constraintlayout-compose:1.0.1")
+            library("compose-constraintlayout", "androidx.constraintlayout:constraintlayout-compose:1.1.0-alpha09")
         }
 
         this.create("exoplayer") {
@@ -56,7 +56,7 @@ dependencyResolutionManagement {
 
         this.create("thirdparty") {
             library("permission", "com.google.accompanist:accompanist-permissions:0.22.0-rc")
-            library("image", "io.coil-kt:coil-compose:1.4.0")
+            library("image", "io.coil-kt:coil-compose:2.4.0")
         }
     }
 }

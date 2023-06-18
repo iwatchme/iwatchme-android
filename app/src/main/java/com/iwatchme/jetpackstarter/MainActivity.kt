@@ -3,7 +3,13 @@ package com.iwatchme.jetpackstarter
 import android.os.Bundle
 import androidx.appcompat.app.AppCompatActivity
 import androidx.activity.compose.setContent
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
+import androidx.constraintlayout.compose.ExperimentalMotionApi
+import com.iwatchme.jetpackstarter.blog.PostFactory
+import com.iwatchme.jetpackstarter.blog.ui.Blog
+import com.iwatchme.jetpackstarter.blog.ui.BlogList
 import com.iwatchme.jetpackstarter.emailbox.Email
 import com.iwatchme.jetpackstarter.emailbox.Inbox
 import com.iwatchme.jetpackstarter.gallery.Gallery
@@ -15,14 +21,17 @@ import com.iwatchme.jetpackstarter.video.Video
 
 class MainActivity : AppCompatActivity() {
 
+    @OptIn(ExperimentalComposeUiApi::class, ExperimentalMotionApi::class)
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-       setContent {
-          Stories()
-       }
-
-
+        setContent {
+//          Stories()
+            Blog(
+                modifier = Modifier.fillMaxSize(),
+                posts = PostFactory.makePosts(),
+            )
+        }
 
 
     }
