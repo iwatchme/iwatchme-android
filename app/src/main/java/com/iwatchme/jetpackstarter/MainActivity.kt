@@ -6,7 +6,6 @@ import androidx.activity.compose.setContent
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
-import androidx.constraintlayout.compose.ExperimentalMotionApi
 import com.iwatchme.jetpackstarter.blog.PostFactory
 import com.iwatchme.jetpackstarter.blog.ui.Blog
 import com.iwatchme.jetpackstarter.blog.ui.BlogList
@@ -21,16 +20,16 @@ import com.iwatchme.jetpackstarter.video.Video
 
 class MainActivity : AppCompatActivity() {
 
-    @OptIn(ExperimentalComposeUiApi::class, ExperimentalMotionApi::class)
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
         setContent {
 //          Stories()
-            Blog(
-                modifier = Modifier.fillMaxSize(),
-                posts = PostFactory.makePosts(),
-            )
+//            Blog(
+//                modifier = Modifier.fillMaxSize(),
+//                posts = PostFactory.makePosts(),
+//            )
+            Stories()
         }
 
 
