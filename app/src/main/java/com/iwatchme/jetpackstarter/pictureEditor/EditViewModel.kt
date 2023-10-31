@@ -7,6 +7,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.lifecycle.ViewModel
+import com.iwatchme.crashlib.CrashLib
 import kotlinx.coroutines.flow.MutableStateFlow
 import java.util.UUID
 import kotlin.math.PI
@@ -32,6 +33,7 @@ class EditViewModel : ViewModel() {
     fun handleEvent(event: EditorEvent) {
         when (event) {
             is EditorEvent.ToolSelected -> {
+                CrashLib.raiseError()
                 uiState.value = uiState.value.copy(selectTool = event.tool)
             }
 

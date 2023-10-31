@@ -74,4 +74,6 @@ dependencies {
     implementation(exoplayer.exoplayer.core)
 
     implementation(jetpack.startup)
+
+    implementation(project(":crashLib"))
 }

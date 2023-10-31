@@ -12,6 +12,7 @@
           <set>
             <option value="$PROJECT_DIR$" />
             <option value="$PROJECT_DIR$/app" />
+            <option value="$PROJECT_DIR$/crashLib" />
             <option value="$PROJECT_DIR$/customCoroutine" />
             <option value="$PROJECT_DIR$/jetpackstarterplayer" />
             <option value="$PROJECT_DIR$/startupLauncher" />
