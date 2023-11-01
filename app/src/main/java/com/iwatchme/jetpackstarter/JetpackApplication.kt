@@ -1,6 +1,7 @@
 package com.iwatchme.jetpackstarter
 
 import android.app.Application
+import android.util.Log
 import com.iwatchme.crashlib.CrashLib
 import com.iwatchme.crashlib.ICrashCallback
 import com.iwatchme.crashlib.SignalConst
@@ -17,15 +18,15 @@ class JetpackApplication : Application() {
                 SignalConst.SIGSEGV
             ), object : ICrashCallback {
                 override fun checkIsAnr(): Boolean {
-                    TODO("Not yet implemented")
+                    return false
                 }
 
                 override fun onHandleAnr() {
-                    TODO("Not yet implemented")
+
                 }
 
-                override fun onHandleCrash() {
-                    TODO("Not yet implemented")
+                override fun onHandleCrash(signal: Int, nativeStackTrace: String) {
+                    Log.e("CrashLib", "s212121ignal: ${signal}; trace: $nativeStackTrace")
                 }
 
             })

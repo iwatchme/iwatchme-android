@@ -16,13 +16,14 @@ object CrashLib {
     }
 
 
+    @JvmStatic
     fun callFromNative(signal: Int, nativeStackTrace: String) {
         crashCallback?.run {
             if (signal == SignalConst.SIGQUIT && checkIsAnr()) {
                 onHandleAnr()
                 return
             }
-            onHandleCrash()
+            onHandleCrash(signal, nativeStackTrace)
         }
 
     }
@@ -36,7 +37,7 @@ object CrashLib {
 interface ICrashCallback {
     fun checkIsAnr(): Boolean
     fun onHandleAnr()
-    fun onHandleCrash()
+    fun onHandleCrash(signal: Int, nativeStackTrace: String)
 }
 
 class SignalConst {
