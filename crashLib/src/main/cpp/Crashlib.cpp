@@ -5,17 +5,31 @@
 #include "sys/eventfd.h"
 #include <unistd.h>
 #include <thread>
+#include <mutex>
+#include <condition_variable>
 
 
 JavaVM *javaVm = nullptr;
 static jclass callClass;
 static int eventId = -1;
+uint64_t data;
+std::mutex mutex;
+std::condition_variable cv;
 
 void (*sig_func)(int, siginfo *, void *) = [](int sig_num, siginfo *info, void *ptr) {
-    uint64_t data = sig_num;
-    if (eventId > 0) {
-       write(eventId, &data, sizeof(data));
-    }
+//    uint64_t data = sig_num;
+//    if (eventId > 0) {
+//       write(eventId, &data, sizeof(data));
+//    }
+    // Acquire lock
+    std::unique_lock<std::mutex> lock(mutex);
+
+    // Write data
+    data = sig_num;
+
+    // Notify waiting thread
+    cv.notify_one();
+
 };
 
 JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM *vm, void *reserved) {
@@ -44,10 +58,18 @@ void* execute_in_thread(void *argvs) {
         }
     }
 
-    uint64_t data;
-    read(eventId, &data, sizeof(data));
 
-    LOGE("env2: %d, %d", data, eventId);
+    std::unique_lock<std::mutex> lock(mutex);
+
+    // Wait for signal
+    cv.wait(lock);
+
+//    uint64_t data;
+//    read(eventId, &data, sizeof(data));
+//
+//    LOGE("env2: %d, %d", data, eventId);
+
+
 
     jmethodID methodId = env->GetStaticMethodID(callClass, "callFromNative",
                                                 "(ILjava/lang/String;)V");
@@ -66,15 +88,13 @@ Java_com_iwatchme_crashlib_CrashLib_registerSignals(
     LOGI("registerSignals %d, %d", getpid(), (unsigned int)pthread_self());
     CrashHandler *handler = new CrashHandler();
     handler->init_with_signal(env, callClass, signals, sig_func);
-    eventId = eventfd(0, EFD_CLOEXEC);
-    LOGI("init eventId: %d", eventId);
+//    eventId = eventfd(0, EFD_CLOEXEC);
+//    LOGI("init eventId: %d", eventId);
 
     pthread_t thread;
     int result = pthread_create(&thread, nullptr, execute_in_thread, nullptr);
-    pthread_setname_np(result , "test");
     if (0 != result) {
-
-        eventId = -1;
+     //TODO
     }
     return true;
 }
