@@ -6,14 +6,14 @@
 #define JETPACKSTARTER_CRASHHANDLER_H
 
 #include <jni.h>
+#include <asm-generic/siginfo.h>
 
 
 class CrashHandler {
 
 
 public:
-    void init_with_signal(JNIEnv *env, jclass klass,
-                          jintArray signals, void (*handler)(int, struct siginfo *, void *));
+    void initWithSignal(JavaVM * javaVm, JNIEnv *env, jclass klass, jintArray signals);
 
 
 private:
