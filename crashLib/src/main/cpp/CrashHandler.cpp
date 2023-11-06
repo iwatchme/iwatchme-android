@@ -21,6 +21,7 @@
 
 static std::map<int, struct sigaction> sOldHandlers;
 static pid_t sTidToDump;    // guarded by sMutex
+static pid_t sPidToDump;
 static void *context;
 static int sigNum;
 static siginfo *sigInfo;
@@ -70,6 +71,7 @@ void CrashHandler::initWithSignal(JavaVM *jvm, JNIEnv *env, jclass kclass, jintA
         sigc.sa_sigaction = [](int sig_num, siginfo *info, void *ctx) {
             std::unique_lock<std::mutex> lock{sMutex};
             sTidToDump = gettid();
+            sPidToDump = getpid();
             sigNum = sig_num;
             context = ctx;
             sigInfo = info;
@@ -115,7 +117,7 @@ void CrashHandler::initWithSignal(JavaVM *jvm, JNIEnv *env, jclass kclass, jintA
                 std::unique_lock<std::mutex> lock{sMutex};
                 sCondition.wait(lock, [] { return sTidToDump > 0; });
                 LOGI("start dump stack");
-                dumpHelper->dumpStacks(sigNum, sigInfo, context);
+                dumpHelper->dumpStacks(sPidToDump, sTidToDump, sigNum, sigInfo, context);
                 sTidToDump = 0;
                 LOGI("dump stack finished");
                 sCondition.notify_one();

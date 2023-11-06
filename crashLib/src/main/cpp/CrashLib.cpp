@@ -15,6 +15,8 @@ auto *crashHandler = new CrashHandler();
 JavaVM *javaVm;
 
 
+void test2();
+
 JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM *vm, void *reserved) {
     JNIEnv *env;
     jclass cls;
@@ -43,11 +45,14 @@ Java_com_iwatchme_crashlib_CrashLib_registerSignals(
 
 
 
+
+
+
+
 extern "C"
 JNIEXPORT void JNICALL
 Java_com_iwatchme_crashlib_CrashLib_raiseError(JNIEnv *env, jobject thiz) {
 //    raise(SIGSEGV);
     LOGE("Start");
     *(int *) 0 = 0;
-
 }

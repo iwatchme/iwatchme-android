@@ -1,3 +1,5 @@
+import com.android.build.api.dsl.Packaging
+
 plugins {
     id("com.android.library")
     id("org.jetbrains.kotlin.android")
@@ -6,6 +8,14 @@ plugins {
 android {
     namespace = "com.iwatchme.crashlib"
     compileSdk = 33
+
+    buildFeatures {
+        prefab = true
+    }
+
+    packagingOptions {
+        exclude("**/libxunwind.so")
+    }
 
     defaultConfig {
         minSdk = 24
@@ -48,6 +58,7 @@ dependencies {
     implementation(platform("org.jetbrains.kotlin:kotlin-bom:1.8.0"))
     implementation(baselibs.appcompat)
     implementation(baselibs.material)
+    implementation(thirdparty.unwind)
     testImplementation("junit:junit:4.13.2")
     androidTestImplementation("androidx.test.ext:junit:1.1.5")
     androidTestImplementation("androidx.test.espresso:espresso-core:3.5.1")

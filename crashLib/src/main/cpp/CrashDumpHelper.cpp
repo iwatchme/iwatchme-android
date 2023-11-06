@@ -5,6 +5,9 @@
 #include "CrashDumpHelper.h"
 #include "CrashLogUtil.h"
 #include <csignal>
+#include "xunwind.h"
+
+#define SAMPLE_LOG_PRIORITY   ANDROID_LOG_INFO
 
 
 void dumpSignalInfo(siginfo *info) {
@@ -131,7 +134,9 @@ void callJavaMethod(JavaVM *javaVm, JNIEnv *env, jclass callClass, int sigNum, c
 }
 
 
-void CrashDumpHelper::dumpStacks(int sigNum, siginfo *siginfo, void *context) {
-       dumpSignalInfo(siginfo);
-       callJavaMethod(this->javaVm, this->env, this->callClass, sigNum, "trace");
+void
+CrashDumpHelper::dumpStacks(pid_t pid, pid_t tid, int sigNum, siginfo *siginfo, void *context) {
+    dumpSignalInfo(siginfo);
+    char* trace = xunwind_cfi_get(pid, tid, context, LOG_TAG);
+    callJavaMethod(this->javaVm, this->env, this->callClass, sigNum, trace);
 }

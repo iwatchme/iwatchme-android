@@ -16,7 +16,7 @@ class CrashDumpHelper {
 
 public:
 
-    void dumpStacks(int sigNum, siginfo *siginfo, void *context);
+    void dumpStacks(pid_t pid, pid_t tid, int sigNum, siginfo *siginfo, void *context);
 
     CrashDumpHelper(JavaVM *jvm, JNIEnv *env, jclass callClass) {
         this->env = env;
@@ -28,6 +28,8 @@ private:
     JNIEnv *env;
     JavaVM *javaVm;
     jclass callClass;
+
+    void dumpStacks(int sigNum, siginfo *siginfo, void *context);
 };
 
 

@@ -57,6 +57,7 @@ dependencyResolutionManagement {
         this.create("thirdparty") {
             library("permission", "com.google.accompanist:accompanist-permissions:0.22.0-rc")
             library("image", "io.coil-kt:coil-compose:2.4.0")
+            library("unwind", "io.github.hexhacking:xunwind:2.0.0")
         }
     }
 }
