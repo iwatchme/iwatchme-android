@@ -1,0 +1,1 @@
+/Users/iwatchme/AndroidStudioProjects/JetpackStarter/customGradlePlugin/build/classes/kotlin/main/CustomGradlePlugin.class:/Users/iwatchme/AndroidStudioProjects/JetpackStarter/customGradlePlugin/build/classes/kotlin/main/CustomGradlePluginConstKt.class

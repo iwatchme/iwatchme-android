@@ -1,3 +1,5 @@
+includeBuild("customGradlePlugin")
+
 pluginManagement {
     repositories {
         google()
