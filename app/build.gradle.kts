@@ -49,6 +49,11 @@ android {
 
 }
 
+customGradlePlugin {
+    enableThreadDetect = true
+}
+
+
 dependencies {
     implementation(baselibs.appcompat)
     implementation(baselibs.core.ktx)

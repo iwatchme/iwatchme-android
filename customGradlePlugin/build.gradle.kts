@@ -12,7 +12,10 @@ repositories {
 
 dependencies {
     implementation(gradleApi())
-    implementation(kotlin("stdlib-jdk8"))
+    implementation(std.kotlin)
+    implementation(std.gradle.plugin)
+    implementation(asm.asm)
+    implementation(asm.asm.commons)
 }
 
 gradlePlugin {
