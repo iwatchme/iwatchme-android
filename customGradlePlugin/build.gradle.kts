@@ -16,6 +16,7 @@ dependencies {
     implementation(std.gradle.plugin)
     implementation(asm.asm)
     implementation(asm.asm.commons)
+    implementation(asm.asm.util)
 }
 
 gradlePlugin {

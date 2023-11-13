@@ -1,5 +1,9 @@
+import com.android.build.api.instrumentation.FramesComputationMode
+import com.android.build.api.instrumentation.InstrumentationScope
+import com.android.build.api.variant.AndroidComponentsExtension
 import com.android.build.gradle.AppExtension
 import com.android.build.gradle.internal.plugins.AppPlugin
+import com.android.build.gradle.internal.tasks.ProcessJavaResTask
 import com.android.build.gradle.internal.tasks.factory.dependsOn
 import org.gradle.api.Plugin
 import org.gradle.api.Project
@@ -20,25 +24,21 @@ class CustomGradlePlugin : Plugin<Project> {
             println("${this}")
             androidAppPluginApplied.set(true)
 
-            val androidExtension = target.extensions.findByType(AppExtension::class.java)
-            androidExtension?.applicationVariants?.configureEach{
-                if (customGradlePluginExtension.enableThreadDetect) {
-                    val appVariant = this
+            val androidComponentExtension = target.extensions.findByType(AndroidComponentsExtension::class.java)
+            androidComponentExtension?.onVariants {
+                 variant ->
+                  if (customGradlePluginExtension.enableThreadDetect) {
+                      variant.instrumentation.transformClassesWith(
+                          DetectThreadAsmFactory::class.java,
+                          InstrumentationScope.ALL
+                      ) {
 
-                   val threadTaskProvider = target.tasks.register<ThreadDetectTask>(
-                        "threadDetectTaskFor${appVariant.name.capitalized()}"
-                    ) {
+                      }
 
-                    }
+                      variant.instrumentation.setAsmFramesComputationMode(FramesComputationMode.COPY_FRAMES)
+                  }
 
-                    val compileTask = target.tasks.getByName("compile${}JavaWithJavac")
-
-                    threadTaskProvider.dependsOn(compileTask)
-
-                }
             }
-
-
         }
     }
 
