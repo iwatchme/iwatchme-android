@@ -1,21 +1,13 @@
 *.iml
 .gradle
 /local.properties
-/.idea/caches
-/.idea/libraries
-/.idea/modules.xml
-/.idea/workspace.xml
-/.idea/navEditor.xml
-/.idea/assetWizardSettings.xml
-/.idea/gradle.xml
 .DS_Store
 /build
 /captures
 .externalNativeBuild
 .cxx
 local.properties
-.idea/gradle.xml
-.idea/misc.xml
-.idea/compiler.xml
-.idea/gradle.xml
-.idea/kotlinc.xml
+.idea/*
+customGradlePlugin/build/
+# Ignore the jar file
+customGradlePlugin/build/libs/*.jar
