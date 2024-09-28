@@ -11,3 +11,4 @@ local.properties
 customGradlePlugin/build/
 # Ignore the jar file
 customGradlePlugin/build/*
+.cache/
