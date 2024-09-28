@@ -10,4 +10,4 @@ local.properties
 .idea/*
 customGradlePlugin/build/
 # Ignore the jar file
-customGradlePlugin/build/libs/*.jar
+customGradlePlugin/build/*

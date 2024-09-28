@@ -47,6 +47,10 @@ android {
         kotlinCompilerExtensionVersion = "1.4.0-alpha02"
     }
 
+    lint {
+        baseline = file("lint-baseline.xml")
+    }
+
 }
 
 customGradlePlugin {
