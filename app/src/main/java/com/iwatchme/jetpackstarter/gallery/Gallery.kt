@@ -1,5 +1,7 @@
 package com.iwatchme.jetpackstarter.gallery
 
+import android.annotation.TargetApi
+import android.os.Build
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material.MaterialTheme
@@ -21,9 +23,15 @@ fun Gallery() {
     val scope = rememberCoroutineScope()
     var retrievedMedia by remember { mutableStateOf<List<Image>?>(null) }
 
+
     val permissionState =
         rememberPermissionState(
-            permission = android.Manifest.permission.READ_MEDIA_IMAGES
+            permission =
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                android.Manifest.permission.READ_MEDIA_IMAGES
+            } else {
+               android.Manifest.permission.READ_EXTERNAL_STORAGE
+            }
         )
 
     LaunchedEffect(key1 = permissionState.hasPermission) {
