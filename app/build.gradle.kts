@@ -49,6 +49,9 @@ android {
 
     lint {
         baseline = file("lint-baseline.xml")
+        disable.apply {
+            add("OldTargetApi")
+        }
     }
 
 }
