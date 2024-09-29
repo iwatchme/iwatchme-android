@@ -48,7 +48,7 @@ dependencyResolutionManagement {
             library("compose-navigation", "androidx.navigation:navigation-compose:2.5.3")
             library("compose-viewmodel", "androidx.lifecycle:lifecycle-viewmodel-compose:2.5.1")
             library("compose-animation", "androidx.compose.animation:animation:1.3.3")
-            library("compose-constraintlayout", "androidx.constraintlayout:constraintlayout-compose:1.1.0-alpha09")
+            library("compose-constraintlayout", "androidx.constraintlayout:constraintlayout-compose:1.1.0-alpha10")
         }
 
         this.create("exoplayer") {

@@ -75,10 +75,7 @@ dependencies {
     implementation(compose.compose.viewmodel)
     implementation(compose.compose.navigation)
     implementation(compose.compose.foundation)
-    implementation(compose.compose.constraintlayout)  {
-        exclude(group = "androidx.constraintlayout", module = "constraintlayout-compose-lint")
-    }
-
+    implementation(compose.compose.constraintlayout)
     implementation(thirdparty.permission)
     implementation(thirdparty.image)
 
