@@ -1,5 +1,3 @@
-import com.android.build.api.dsl.Packaging
-
 plugins {
     id("com.android.library")
     id("org.jetbrains.kotlin.android")
@@ -12,9 +10,10 @@ android {
     buildFeatures {
         prefab = true
     }
-
     packagingOptions {
-        exclude("**/libxunwind.so")
+        jniLibs {
+            excludes += setOf("**/libxunwind.so")
+        }
     }
 
     defaultConfig {
@@ -54,12 +53,11 @@ android {
 }
 
 dependencies {
-    implementation(baselibs.core.ktx)
-    implementation(platform("org.jetbrains.kotlin:kotlin-bom:1.8.0"))
-    implementation(baselibs.appcompat)
-    implementation(baselibs.material)
-    implementation(thirdparty.unwind)
-    testImplementation("junit:junit:4.13.2")
-    androidTestImplementation("androidx.test.ext:junit:1.1.5")
-    androidTestImplementation("androidx.test.espresso:espresso-core:3.5.1")
+    implementation(libs.core.ktx)
+    implementation(libs.appcompat)
+    implementation(libs.material)
+    implementation(libs.unwind)
+    testImplementation(libs.junit)
+    androidTestImplementation(libs.androidx.test.junit)
+    androidTestImplementation(libs.androidx.test.espresso)
 }
