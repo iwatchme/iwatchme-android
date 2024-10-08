@@ -44,7 +44,7 @@ android {
      * compose的最新版本号
      * */
     composeOptions {
-        kotlinCompilerExtensionVersion = "1.4.0-alpha02"
+        kotlinCompilerExtensionVersion = "1.5.2"
     }
 
     lint {
