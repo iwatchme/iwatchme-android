@@ -1,8 +1,8 @@
 plugins {
-    id ("com.android.application")
-    id ("org.jetbrains.kotlin.android")
-    id("kotlin-parcelize")
+    alias(libs.plugins.android.application)
+    alias(libs.plugins.kotlin.android)
     id("custom-gradle-plugin")
+    alias(libs.plugins.kotlin.parcelize)
 }
 
 android {
@@ -19,7 +19,7 @@ android {
         testInstrumentationRunner ="androidx.test.runner.AndroidJUnitRunner"
     }
 
-    buildFeatures {
+    buildFeatures.apply {
         compose = true
     }
 
@@ -44,7 +44,7 @@ android {
      * compose的最新版本号
      * */
     composeOptions {
-        kotlinCompilerExtensionVersion = "1.4.0-alpha02"
+        kotlinCompilerExtensionVersion = "1.5.2"
     }
 
     lint {
@@ -62,30 +62,27 @@ customGradlePlugin {
 
 
 dependencies {
-    implementation(baselibs.appcompat)
-    implementation(baselibs.core.ktx)
-    implementation(baselibs.material)
-    testImplementation(baselibs.junit)
-    androidTestImplementation(baselibs.androidx.test.junit)
-    androidTestImplementation(baselibs.androidx.test.espresso)
+    implementation(libs.appcompat)
+    implementation(libs.core.ktx)
+    implementation(libs.material)
 
-
-    implementation(compose.compose.activity)
-    implementation(compose.compose.material)
-    implementation(compose.compose.material.icons.extended)
-    implementation(compose.compose.animation)
-    implementation(compose.compose.ui.tooling)
-    implementation(compose.compose.viewmodel)
-    implementation(compose.compose.navigation)
-    implementation(compose.compose.foundation)
-    implementation(compose.compose.constraintlayout)
-    implementation(thirdparty.permission)
-    implementation(thirdparty.image)
-
-    implementation(exoplayer.exoplayer.ui)
-    implementation(exoplayer.exoplayer.core)
-
-    implementation(jetpack.startup)
-
+    implementation(libs.compose.activity)
+    implementation(libs.compose.material)
+    implementation(libs.compose.material.icons.extended)
+    implementation(libs.compose.animation)
+    implementation(libs.compose.ui.tooling)
+    implementation(libs.compose.viewmodel)
+    implementation(libs.compose.navigation)
+    implementation(libs.compose.foundation)
+    implementation(libs.compose.constraintlayout)
+    implementation(libs.permission)
+    implementation(libs.image)
+    implementation(libs.exoplayer.ui)
+    implementation(libs.exoplayer.core)
+    implementation(libs.startup)
     implementation(project(":crashLib"))
+
+    testImplementation(libs.junit)
+    androidTestImplementation(libs.androidx.test.junit)
+    androidTestImplementation(libs.androidx.test.espresso)
 }
