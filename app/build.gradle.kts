@@ -80,6 +80,7 @@ dependencies {
     implementation(libs.exoplayer.ui)
     implementation(libs.exoplayer.core)
     implementation(libs.startup)
+    implementation(libs.androidx.activity)
     implementation(project(":crashLib"))
     implementation(project(":cryptotrack"))
 
