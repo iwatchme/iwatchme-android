@@ -13,3 +13,4 @@ customGradlePlugin/build/
 customGradlePlugin/build/*
 .cache/
 .fleet/
+.idea

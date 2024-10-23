@@ -7,7 +7,7 @@ plugins {
 
 android {
     namespace="com.iwatchme.jetpackstarter"
-    compileSdk = 33
+    compileSdk = 34
 
     defaultConfig {
         applicationId = "com.iwatchme.jetpackstarter"
@@ -81,6 +81,7 @@ dependencies {
     implementation(libs.exoplayer.core)
     implementation(libs.startup)
     implementation(project(":crashLib"))
+    implementation(project(":cryptotrack"))
 
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.test.junit)
