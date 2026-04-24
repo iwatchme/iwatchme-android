@@ -4,6 +4,7 @@ plugins {
 }
 
 android {
+    ndkVersion = "27.2.12479018"
     namespace = "com.iwatchme.jetpackstarterplayer"
     compileSdk = 33
 
@@ -18,6 +19,7 @@ android {
 
         ndk{
             abiFilters.add("armeabi-v7a")
+            abiFilters.add("arm64-v8a")
         }
         externalNativeBuild {
             cmake {

@@ -1,7 +1,7 @@
 #!/bin/bash
  
 #你的NDK路径
-NDK=/Users/iwatchme/Sdk/Android/sdk/ndk/21.4.7075529
+NDK=/Users/iwatchme/android/sdk/ndk/27.2.12479018
 TOOLCHAIN=$NDK/toolchains/llvm/prebuilt/darwin-x86_64
 API=21
  
@@ -61,21 +61,21 @@ build_android
  
 #################### armv8-a ################################
  
-# echo "开始编译FFmpeg(arm64-v8a)"
-# source "config-env.sh"
-# OUTPUT_FOLDER="arm64-v8a"
-# ARCH=arm64
-# CPU="armv8-a"
-# TOOL_CPU_NAME=aarch64
-# TOOL_PREFIX="$TOOLCHAIN/bin/$TOOL_CPU_NAME-linux-android"
+echo "开始编译FFmpeg(arm64-v8a)"
+source "config-env.sh"
+OUTPUT_FOLDER="arm64-v8a"
+ARCH=arm64
+CPU="armv8-a"
+TOOL_CPU_NAME=aarch64
+TOOL_PREFIX="$TOOLCHAIN/bin/$TOOL_CPU_NAME-linux-android"
  
-# CC="$TOOL_PREFIX$API-clang"
-# CXX="$TOOL_PREFIX$API-clang++"
-# SYSROOT="$NDK/toolchains/llvm/prebuilt/darwin-x86_64/sysroot"
-# PREFIX="${PWD}/android/$OUTPUT_FOLDER"
-# LIB_DIR="${PWD}/android/libs/$OUTPUT_FOLDER"
-# OPTIMIZE_CFLAGS="-march=$CPU"
-# build_android
+CC="$TOOL_PREFIX$API-clang"
+CXX="$TOOL_PREFIX$API-clang++"
+SYSROOT="$NDK/toolchains/llvm/prebuilt/darwin-x86_64/sysroot"
+PREFIX="${PWD}/../ffmpeg_library/android/$OUTPUT_FOLDER"
+LIB_DIR="${PWD}/../ffmpeg_library/android/libs/$OUTPUT_FOLDER"
+OPTIMIZE_CFLAGS="-march=$CPU"
+build_android
  
 #################### x86 ################################
  

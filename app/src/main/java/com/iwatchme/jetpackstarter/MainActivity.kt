@@ -1,20 +1,16 @@
 package com.iwatchme.jetpackstarter
 
 import android.os.Bundle
+import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
-import androidx.appcompat.app.AppCompatActivity
-import com.iwatchme.jetpackstarter.gallery.Gallery
-import com.iwatchme.jetpackstarter.pictureEditor.Stories
+import com.iwatchme.jetpackstarter.shell.JetpackStarterApp
 
-
-class MainActivity : AppCompatActivity() {
-
+class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContent {
-            Gallery()
+            JetpackStarterApp()
         }
-
-
+        reportFullyDrawn()
     }
 }

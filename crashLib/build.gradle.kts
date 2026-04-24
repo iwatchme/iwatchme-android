@@ -4,6 +4,7 @@ plugins {
 }
 
 android {
+    ndkVersion = "27.2.12479018"
     namespace = "com.iwatchme.crashlib"
     compileSdk = 33
 

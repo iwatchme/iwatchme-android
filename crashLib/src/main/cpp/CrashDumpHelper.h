@@ -18,14 +18,12 @@ public:
 
     void dumpStacks(pid_t pid, pid_t tid, int sigNum, siginfo *siginfo, void *context);
 
-    CrashDumpHelper(JavaVM *jvm, JNIEnv *env, jclass callClass) {
-        this->env = env;
+    CrashDumpHelper(JavaVM *jvm, JNIEnv *, jclass callClass) {
         this->callClass = callClass;
         this->javaVm = jvm;
     }
 
 private:
-    JNIEnv *env;
     JavaVM *javaVm;
     jclass callClass;
 

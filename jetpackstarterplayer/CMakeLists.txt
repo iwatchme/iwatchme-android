@@ -4,6 +4,7 @@
 # Sets the minimum version of CMake required to build the native library.
 
 cmake_minimum_required(VERSION 3.4.1)
+project("jetpackstarterplayer_native")
 
 # Creates and names a library, sets it as either STATIC
 # or SHARED, and provides the relative paths to its source code.
@@ -11,29 +12,33 @@ cmake_minimum_required(VERSION 3.4.1)
 # Gradle automatically packages shared libraries with your APK.
 
 message("Hello: ${CMAKE_CURRENT_SOURCE_DIR}")
+set(FFMPEG_ABI ${CMAKE_ANDROID_ARCH_ABI})
+if(NOT FFMPEG_ABI)
+    set(FFMPEG_ABI armeabi-v7a)
+endif()
 
 add_library(avcodec SHARED IMPORTED)
-set_target_properties(avcodec PROPERTIES IMPORTED_LOCATION ${CMAKE_CURRENT_SOURCE_DIR}/../ffmpeg_library/android/libs/armeabi-v7a/libavcodec.so)
+set_target_properties(avcodec PROPERTIES IMPORTED_LOCATION ${CMAKE_CURRENT_SOURCE_DIR}/../ffmpeg_library/android/libs/${FFMPEG_ABI}/libavcodec.so)
 
 add_library(avfilter SHARED IMPORTED)
-set_target_properties(avfilter PROPERTIES IMPORTED_LOCATION ${CMAKE_CURRENT_SOURCE_DIR}/../ffmpeg_library/android/libs/armeabi-v7a/libavfilter.so)
+set_target_properties(avfilter PROPERTIES IMPORTED_LOCATION ${CMAKE_CURRENT_SOURCE_DIR}/../ffmpeg_library/android/libs/${FFMPEG_ABI}/libavfilter.so)
 
 add_library(avformat SHARED IMPORTED)
-set_target_properties(avformat PROPERTIES IMPORTED_LOCATION ${CMAKE_CURRENT_SOURCE_DIR}/../ffmpeg_library/android/libs/armeabi-v7a/libavformat.so)
+set_target_properties(avformat PROPERTIES IMPORTED_LOCATION ${CMAKE_CURRENT_SOURCE_DIR}/../ffmpeg_library/android/libs/${FFMPEG_ABI}/libavformat.so)
 
 add_library(avutil SHARED IMPORTED)
-set_target_properties(avutil PROPERTIES IMPORTED_LOCATION ${CMAKE_CURRENT_SOURCE_DIR}/../ffmpeg_library/android/libs/armeabi-v7a/libavutil.so)
+set_target_properties(avutil PROPERTIES IMPORTED_LOCATION ${CMAKE_CURRENT_SOURCE_DIR}/../ffmpeg_library/android/libs/${FFMPEG_ABI}/libavutil.so)
 
 add_library(swresample SHARED IMPORTED)
-set_target_properties(swresample PROPERTIES IMPORTED_LOCATION ${CMAKE_CURRENT_SOURCE_DIR}/../ffmpeg_library/android/libs/armeabi-v7a/libswresample.so)
+set_target_properties(swresample PROPERTIES IMPORTED_LOCATION ${CMAKE_CURRENT_SOURCE_DIR}/../ffmpeg_library/android/libs/${FFMPEG_ABI}/libswresample.so)
 
 add_library(swscale SHARED IMPORTED)
-set_target_properties(swscale PROPERTIES IMPORTED_LOCATION ${CMAKE_CURRENT_SOURCE_DIR}/../ffmpeg_library/android/libs/armeabi-v7a/libswscale.so)
+set_target_properties(swscale PROPERTIES IMPORTED_LOCATION ${CMAKE_CURRENT_SOURCE_DIR}/../ffmpeg_library/android/libs/${FFMPEG_ABI}/libswscale.so)
 
 
 
 
-include_directories(../ffmpeg_library/android/armeabi-v7a/include)
+include_directories(../ffmpeg_library/android/${FFMPEG_ABI}/include)
 
 include_directories(main/cpp/codec)
 include_directories(main/cpp/common)

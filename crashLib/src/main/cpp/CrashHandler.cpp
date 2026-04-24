@@ -27,9 +27,34 @@ static int sigNum;
 static siginfo *sigInfo;
 static std::mutex sMutex;
 static std::condition_variable sCondition;
+static std::once_flag sDumpThreadOnce;
 
 
 CrashDumpHelper *dumpHelper;
+
+static void invokePreviousOrDefault(int sigNum, siginfo *info, void *ctx) {
+    auto it = sOldHandlers.find(sigNum);
+    if (it == sOldHandlers.end()) {
+        signal(sigNum, SIG_DFL);
+        raise(sigNum);
+        return;
+    }
+
+    const struct sigaction &oldAction = it->second;
+    if ((oldAction.sa_flags & SA_SIGINFO) != 0 && oldAction.sa_sigaction != nullptr) {
+        oldAction.sa_sigaction(sigNum, info, ctx);
+        return;
+    }
+    if (oldAction.sa_handler == SIG_IGN) {
+        return;
+    }
+    if (oldAction.sa_handler == SIG_DFL || oldAction.sa_handler == nullptr) {
+        signal(sigNum, SIG_DFL);
+        raise(sigNum);
+        return;
+    }
+    oldAction.sa_handler(sigNum);
+}
 
 void CrashHandler::initWithSignal(JavaVM *jvm, JNIEnv *env, jclass kclass, jintArray signals) {
 
@@ -37,7 +62,7 @@ void CrashHandler::initWithSignal(JavaVM *jvm, JNIEnv *env, jclass kclass, jintA
 
     jint *signalsFromJava = env->GetIntArrayElements(signals, 0);
     int size = env->GetArrayLength(signals);
-    bool needMask;
+    bool needMask = false;
 
     for (int i = 0; i < size; ++i) {
         if (signalsFromJava[i] == SIGQUIT) {
@@ -79,15 +104,8 @@ void CrashHandler::initWithSignal(JavaVM *jvm, JNIEnv *env, jclass kclass, jintA
             LOGW("signal %d caught", sig_num);
             sCondition.notify_one();
             sCondition.wait(lock, [] { return sTidToDump == 0; });
-            LOGI("resume old handlers: %d", sOldHandlers.size());
-            auto it = sOldHandlers.find(sig_num);
-            if (it != sOldHandlers.end()) {
-                if (it->second.sa_flags & SA_SIGINFO) {
-                    it->second.sa_sigaction(sig_num, info, ctx);
-                } else {
-                    it->second.sa_handler(sig_num);
-                }
-            }
+            LOGI("resume old handlers: %zu", sOldHandlers.size());
+            invokePreviousOrDefault(sig_num, info, ctx);
 
         };
         sigfillset(&sigc.sa_mask);
@@ -98,9 +116,6 @@ void CrashHandler::initWithSignal(JavaVM *jvm, JNIEnv *env, jclass kclass, jintA
             LOGI("start register signal %d", signalsFromJava[i]);
             if (0 != sigaction(signalsFromJava[i], &sigc, &old_action)) {
                 LOGE("register signal %d failed", signalsFromJava[i]);
-                if (old_action.sa_handler != SIG_DFL && old_action.sa_handler != SIG_IGN) {
-                    sOldHandlers[signalsFromJava[i]] = old_action;
-                }
                 handleException(env);
                 // 失败后需要恢复原样
                 if (needMask) {
@@ -108,22 +123,26 @@ void CrashHandler::initWithSignal(JavaVM *jvm, JNIEnv *env, jclass kclass, jintA
                 }
                 break;
             }
+            sOldHandlers[signalsFromJava[i]] = old_action;
         }
     } while (false);
 
     env->ReleaseIntArrayElements(signals, signalsFromJava, 0);
-    std::thread{
-            [] {
-                std::unique_lock<std::mutex> lock{sMutex};
-                sCondition.wait(lock, [] { return sTidToDump > 0; });
-                LOGI("start dump stack");
-                dumpHelper->dumpStacks(sPidToDump, sTidToDump, sigNum, sigInfo, context);
-                sTidToDump = 0;
-                LOGI("dump stack finished");
-                sCondition.notify_one();
-            }
-    }.detach();
-
+    std::call_once(sDumpThreadOnce, [] {
+        std::thread{
+                [] {
+                    while (true) {
+                        std::unique_lock<std::mutex> lock{sMutex};
+                        sCondition.wait(lock, [] { return sTidToDump > 0; });
+                        LOGI("start dump stack");
+                        dumpHelper->dumpStacks(sPidToDump, sTidToDump, sigNum, sigInfo, context);
+                        sTidToDump = 0;
+                        LOGI("dump stack finished");
+                        sCondition.notify_one();
+                    }
+                }
+        }.detach();
+    });
 }
 
 void CrashHandler::handleException(JNIEnv *env) {
