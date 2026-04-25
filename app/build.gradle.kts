@@ -1,5 +1,6 @@
 plugins {
     alias(libs.plugins.android.application)
+    alias(libs.plugins.baselineprofile)
     alias(libs.plugins.kotlin.android)
     id("custom-gradle-plugin")
 }
@@ -7,7 +8,7 @@ plugins {
 android {
     ndkVersion = "27.2.12479018"
     namespace = "com.iwatchme.jetpackstarter"
-    compileSdk = 33
+    compileSdk = 34
 
     defaultConfig {
         applicationId = "com.iwatchme.jetpackstarter"
@@ -25,7 +26,7 @@ android {
 
     buildTypes {
         getByName("release") {
-            isMinifyEnabled = false
+            isMinifyEnabled = true
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro",
@@ -59,7 +60,9 @@ customGradlePlugin {
 dependencies {
     implementation(libs.appcompat)
     implementation(libs.core.ktx)
+    implementation(libs.core.splashscreen)
     implementation(libs.material)
+    implementation(libs.profileinstaller)
 
     implementation(libs.compose.activity)
     implementation(libs.compose.foundation)
@@ -68,6 +71,8 @@ dependencies {
     implementation(libs.activity.ktx)
 
     implementation(project(":crashLib"))
+    implementation(project(":startupLab"))
+    baselineProfile(project(":baselineprofile"))
 
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.test.junit)

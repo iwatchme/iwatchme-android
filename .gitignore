@@ -3,11 +3,15 @@
 /local.properties
 .DS_Store
 /build
+**/build/
+**/.gradle/
+**/.kotlin/
 /captures
 .externalNativeBuild
 .cxx
 local.properties
 .idea/*
+.claude/settings.local.json
 customGradlePlugin/build/
 # Ignore the jar file
 customGradlePlugin/build/*

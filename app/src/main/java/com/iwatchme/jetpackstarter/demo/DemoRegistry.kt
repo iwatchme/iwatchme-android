@@ -1,10 +1,19 @@
 package com.iwatchme.jetpackstarter.demo
 
 import com.iwatchme.jetpackstarter.demo.crash.CrashLibDemoScreen
+import com.iwatchme.startuplab.ui.StartupInspectorScreen
 
 object DemoRegistry {
 
     private val registeredDemos: List<DemoEntry> = listOf(
+        DemoEntry(
+            route = "demo/startup-inspector",
+            title = "Startup Inspector",
+            description = "Inspect provider cost, phase breakdown, timeline, and mode comparison for the current cold start.",
+            content = {
+                StartupInspectorScreen()
+            },
+        ),
         DemoEntry(
             route = "demo/crashlib",
             title = "CrashLib Demo",

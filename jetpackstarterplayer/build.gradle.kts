@@ -6,7 +6,7 @@ plugins {
 android {
     ndkVersion = "27.2.12479018"
     namespace = "com.iwatchme.jetpackstarterplayer"
-    compileSdk = 33
+    compileSdk = 34
 
     defaultConfig {
         applicationId = "com.iwatchme.jetpackstarterplayer"

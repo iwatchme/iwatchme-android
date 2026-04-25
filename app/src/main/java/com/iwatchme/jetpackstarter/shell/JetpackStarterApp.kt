@@ -6,10 +6,14 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 
 @Composable
-fun JetpackStarterApp() {
+fun JetpackStarterApp(
+    onContentVisible: () -> Unit,
+) {
     MaterialTheme {
         Surface(modifier = Modifier) {
-            AppNavHost()
+            AppNavHost(
+                onContentVisible = onContentVisible,
+            )
         }
     }
 }

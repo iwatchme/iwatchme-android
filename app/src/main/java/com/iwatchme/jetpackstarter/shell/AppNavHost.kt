@@ -17,15 +17,20 @@ import androidx.navigation.compose.rememberNavController
 import com.iwatchme.jetpackstarter.R
 import com.iwatchme.jetpackstarter.demo.DemoRegistry
 import com.iwatchme.jetpackstarter.home.HomeScreen
+import com.iwatchme.startuplab.state.StartupDashboardStore
 
 private const val HOME_ROUTE = "home"
 
 @Composable
-fun AppNavHost(modifier: Modifier = Modifier) {
+fun AppNavHost(
+    modifier: Modifier = Modifier,
+    onContentVisible: () -> Unit,
+) {
     val navController = rememberNavController()
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = navBackStackEntry?.destination?.route
     val currentDemo = DemoRegistry.demos.firstOrNull { it.route == currentRoute }
+    val startupState = StartupDashboardStore.state
 
     Scaffold(
         modifier = modifier.fillMaxSize(),
@@ -54,8 +59,10 @@ fun AppNavHost(modifier: Modifier = Modifier) {
         ) {
             composable(HOME_ROUTE) {
                 HomeScreen(
+                    startupState = startupState,
                     demos = DemoRegistry.demos,
                     onDemoClick = { entry -> navController.navigate(entry.route) },
+                    onContentVisible = onContentVisible,
                 )
             }
             DemoRegistry.demos.forEach { demo ->

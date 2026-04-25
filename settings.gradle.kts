@@ -21,7 +21,10 @@ dependencyResolutionManagement {
 }
 rootProject.name = "JetpackStarter"
 include(":app")
+include(":baselineprofile")
+include(":benchmark")
 include(":customCoroutine")
-include(":startupLauncher")
+include(":startupRuntime")
+include(":startupLab")
 include(":jetpackstarterplayer")
 include(":crashLib")
