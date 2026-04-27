@@ -1,34 +1,19 @@
 plugins {
-    alias(libs.plugins.android.test)
-    alias(libs.plugins.kotlin.android)
+    id("jetpackstarter.android.test")
 }
 
 android {
     namespace = "com.iwatchme.jetpackstarter.benchmark"
-    compileSdk = 34
     targetProjectPath = ":app"
-
-    defaultConfig {
-        minSdk = 24
-        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
-        testInstrumentationRunnerArguments["androidx.benchmark.suppressErrors"] = "EMULATOR,LOW-BATTERY"
-    }
 
     experimentalProperties["android.experimental.self-instrumenting"] = true
 
-    compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_1_8
-        targetCompatibility = JavaVersion.VERSION_1_8
-    }
-
-    packaging {
-        jniLibs {
-            keepDebugSymbols += setOf("**/*.so")
+    buildTypes {
+        create("benchmark") {
+            isDebuggable = true
+            signingConfig = signingConfigs.getByName("debug")
+            matchingFallbacks += listOf("release")
         }
-    }
-
-    kotlinOptions {
-        jvmTarget = "1.8"
     }
 }
 

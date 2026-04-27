@@ -1,6 +1,5 @@
-includeBuild("customGradlePlugin")
-
 pluginManagement {
+    includeBuild("build-logic")
     repositories {
         maven(url = "https://maven.aliyun.com/repository/google")
         maven(url = "https://maven.aliyun.com/repository/public")
@@ -10,6 +9,9 @@ pluginManagement {
         gradlePluginPortal()
     }
 }
+
+includeBuild("customGradlePlugin")
+
 dependencyResolutionManagement {
     repositories {
         maven(url = "https://maven.aliyun.com/repository/google")

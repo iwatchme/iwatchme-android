@@ -25,6 +25,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import com.iwatchme.startuplab.workload.generated.WorkloadRunner
 
 object JetpackStartupManager {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
@@ -178,7 +179,13 @@ object JetpackStartupManager {
                     StartupLog.d(
                         "OPTIMIZED task body start id=${spec.id} stage=${spec.stage} dispatcher=${spec.dispatcher} deps=${spec.dependencies.joinToString()} thread=${Thread.currentThread().name}",
                     )
-                    delay(spec.durationMs)
+                    // Execute real CPU work (class loading + collection + regex)
+                    // so Baseline Profile AOT compilation has a measurable effect.
+                    WorkloadRunner.runForTask(spec.id)
+                    // Keep a small delay for IO-bound tasks to simulate network/disk latency
+                    if (spec.dispatcher == StartupDispatcher.IO) {
+                        delay(spec.durationMs / 2)
+                    }
                     when (spec.id) {
                         "cache_feed" -> StartupDashboardStore.update { current ->
                             current.copy(feedItems = StartupScenarioCatalog.cachedFeed, feedSource = "Cache")

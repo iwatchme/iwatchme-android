@@ -17,6 +17,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
+import com.iwatchme.startuplab.workload.generated.WorkloadRunner
 
 object LegacyStartupRunner {
     data class Result(
@@ -148,6 +149,7 @@ object LegacyStartupRunner {
                 StartupLog.d(
                     "LEGACY serial start task=${spec.id} stage=${spec.stage} dispatcher=${spec.dispatcher} deps=${spec.dependencies.joinToString()} thread=${Thread.currentThread().name}",
                 )
+                WorkloadRunner.runForTask(spec.id)
                 Thread.sleep(durationTarget)
                 applyTaskEffects(spec)
                 val durationMs = SystemClock.elapsedRealtime() - startedAtMs - startOffset
@@ -169,6 +171,7 @@ object LegacyStartupRunner {
                 StartupLog.d(
                     "LEGACY serial start task=${spec.id} stage=${spec.stage} dispatcher=${spec.dispatcher} deps=${spec.dependencies.joinToString()} thread=${Thread.currentThread().name}",
                 )
+                WorkloadRunner.runForTask(spec.id)
                 delay(durationTarget)
                 applyTaskEffects(spec)
                 val durationMs = SystemClock.elapsedRealtime() - startedAtMs - startOffset

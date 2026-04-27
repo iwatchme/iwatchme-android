@@ -1,27 +1,17 @@
 plugins {
-    alias(libs.plugins.android.application)
+    id("jetpackstarter.android.application.compose")
     alias(libs.plugins.baselineprofile)
-    alias(libs.plugins.kotlin.android)
     id("custom-gradle-plugin")
 }
 
 android {
     ndkVersion = "27.2.12479018"
     namespace = "com.iwatchme.jetpackstarter"
-    compileSdk = 34
 
     defaultConfig {
         applicationId = "com.iwatchme.jetpackstarter"
-        minSdk = 24
-        targetSdk = 33
         versionCode = 1
         versionName = "1.0"
-
-        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
-    }
-
-    buildFeatures {
-        compose = true
     }
 
     buildTypes {
@@ -32,19 +22,12 @@ android {
                 "proguard-rules.pro",
             )
         }
-    }
-
-    compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_1_8
-        targetCompatibility = JavaVersion.VERSION_1_8
-    }
-
-    kotlinOptions {
-        jvmTarget = "1.8"
-    }
-
-    composeOptions {
-        kotlinCompilerExtensionVersion = "1.5.2"
+        create("benchmark") {
+            initWith(getByName("release"))
+            signingConfig = signingConfigs.getByName("debug")
+            matchingFallbacks += listOf("release")
+            isDebuggable = false
+        }
     }
 
     lint {
