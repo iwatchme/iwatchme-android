@@ -199,6 +199,60 @@ Java_com_iwatchme_renderengine_RenderEngine_nativeSetTimeline(
     return engine->setTimeline(std::move(clips)) ? JNI_TRUE : JNI_FALSE;
 }
 
+extern "C" JNIEXPORT jboolean JNICALL
+Java_com_iwatchme_renderengine_RenderEngine_nativeSetMultiTrackTimeline(
+    JNIEnv* env, jobject /* this */, jlong handle,
+    jint trackCount, jintArray clipCounts,
+    jobjectArray allPaths, jlongArray allTrimIns, jlongArray allTrimOuts,
+    jfloat overlayAlpha)
+{
+    auto* engine = getEngine(handle);
+
+    jint* counts = env->GetIntArrayElements(clipCounts, nullptr);
+    jlong* trimInArr = env->GetLongArrayElements(allTrimIns, nullptr);
+    jlong* trimOutArr = env->GetLongArrayElements(allTrimOuts, nullptr);
+
+    int totalClips = env->GetArrayLength(allPaths);
+    int offset = 0;
+
+    std::vector<Clip> primaryClips;
+    std::vector<Clip> overlayClips;
+
+    for (int t = 0; t < trackCount; t++) {
+        int count = counts[t];
+        std::vector<Clip>& target = (t == 0) ? primaryClips : overlayClips;
+        target.reserve(count);
+
+        for (int i = 0; i < count; i++) {
+            int idx = offset + i;
+            auto jpath = (jstring)env->GetObjectArrayElement(allPaths, idx);
+            const char* path = env->GetStringUTFChars(jpath, nullptr);
+
+            Clip clip;
+            clip.sourcePath = path;
+            clip.trimIn = trimInArr[idx];
+            clip.trimOut = trimOutArr[idx];
+            target.push_back(std::move(clip));
+
+            env->ReleaseStringUTFChars(jpath, path);
+            env->DeleteLocalRef(jpath);
+        }
+        offset += count;
+    }
+
+    env->ReleaseIntArrayElements(clipCounts, counts, 0);
+    env->ReleaseLongArrayElements(allTrimIns, trimInArr, 0);
+    env->ReleaseLongArrayElements(allTrimOuts, trimOutArr, 0);
+
+    return engine->setMultiTrackTimeline(std::move(primaryClips), std::move(overlayClips),
+                                          (float)overlayAlpha) ? JNI_TRUE : JNI_FALSE;
+}
+
+extern "C" JNIEXPORT void JNICALL
+Java_com_iwatchme_renderengine_RenderEngine_nativeSetOverlayAlpha(JNIEnv* /* env */, jobject /* this */, jlong handle, jfloat alpha) {
+    getEngine(handle)->setOverlayAlpha((float)alpha);
+}
+
 extern "C" JNIEXPORT jlong JNICALL
 Java_com_iwatchme_renderengine_RenderEngine_nativeGetPosition(JNIEnv* /* env */, jobject /* this */, jlong handle) {
     return getEngine(handle)->getPosition();

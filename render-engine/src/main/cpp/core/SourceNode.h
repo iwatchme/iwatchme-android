@@ -18,7 +18,11 @@ public:
     bool initGL(int width, int height);
     void releaseGL();
 
+    void setActive(bool active) { active_ = active; }
+    bool isActive() const { return active_; }
+
 private:
+    bool active_ = true;
     SurfaceTextureHelper* stHelper_;
     JNIEnv* env_;
 

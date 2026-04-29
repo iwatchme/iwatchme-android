@@ -3,6 +3,7 @@
 #include <GLES3/gl3.h>
 #include <unistd.h>
 #include <chrono>
+#include <algorithm>
 
 extern "C" {
 #include <libavcodec/avcodec.h>
@@ -81,9 +82,17 @@ void RenderEngine::seekFast(int64_t positionUs) {
          generation, (long long)positionUs);
 }
 
+void RenderEngine::setOverlayAlpha(float alpha) {
+    overlayAlpha_.store(alpha);
+}
+
 int64_t RenderEngine::getDuration() const {
-    if (!timeline_.isEmpty()) return timeline_.durationUs();
-    return demuxer_.durationUs();
+    int64_t primary = !timeline_.isEmpty() ? timeline_.durationUs() : demuxer_.durationUs();
+    if (hasOverlay_ && !overlayTimeline_.isEmpty()) {
+        int64_t overlay = overlayTimeline_.durationUs();
+        return std::max(primary, overlay);
+    }
+    return primary;
 }
 int64_t RenderEngine::getPosition() const { return currentPositionUs_.load(); }
 int RenderEngine::getVideoWidth() const { return demuxer_.videoWidth(); }
@@ -232,6 +241,61 @@ bool RenderEngine::setTimeline(std::vector<Clip> clips) {
     return true;
 }
 
+bool RenderEngine::setMultiTrackTimeline(std::vector<Clip> primaryClips,
+                                         std::vector<Clip> overlayClips,
+                                         float overlayAlpha) {
+    uint32_t generation = beginTimelineTransition();
+
+    // Probe primary clips
+    for (auto& clip : primaryClips) {
+        if (clip.trimOut < 0) {
+            Demuxer probe;
+            if (probe.open(clip.sourcePath.c_str())) {
+                clip.trimOut = probe.durationUs();
+                probe.close();
+            } else {
+                LOGE("setMultiTrackTimeline: failed to probe primary %s", clip.sourcePath.c_str());
+                return false;
+            }
+        }
+    }
+
+    // Probe overlay clips
+    for (auto& clip : overlayClips) {
+        if (clip.trimOut < 0) {
+            Demuxer probe;
+            if (probe.open(clip.sourcePath.c_str())) {
+                clip.trimOut = probe.durationUs();
+                probe.close();
+            } else {
+                LOGE("setMultiTrackTimeline: failed to probe overlay %s", clip.sourcePath.c_str());
+                return false;
+            }
+        }
+    }
+
+    {
+        std::lock_guard<std::mutex> lock(videoSourceMutex_);
+        timeline_.setClips(std::move(primaryClips));
+        if (!overlayClips.empty()) {
+            overlayTimeline_.setClips(std::move(overlayClips));
+            overlayAlpha_ = overlayAlpha;
+            hasOverlay_ = true;
+        } else {
+            overlayTimeline_ = Timeline();
+            hasOverlay_ = false;
+        }
+        videoSourceChanged_.store(true);
+    }
+
+    cmdCond_.notify_one();
+    LOGI("setMultiTrackTimeline: primary=%d clips, overlay=%s (alpha=%.2f), generation=%u",
+         timeline_.clipCount(),
+         hasOverlay_ ? std::to_string(overlayTimeline_.clipCount()).c_str() : "none",
+         overlayAlpha_.load(), generation);
+    return true;
+}
+
 void RenderEngine::startRenderThread() {
     running_.store(true);
     renderThread_ = std::thread(&RenderEngine::renderThreadFunc, this);
@@ -291,7 +355,16 @@ bool RenderEngine::initDecodePipeline(JNIEnv* env) {
         LOGE("RenderEngine: OutputNode GL init failed");
         return false;
     }
-    outputNode_->inputs.push_back(sourceNode_);
+
+    // 初始化叠加轨道（如果有），然后构建渲染树
+    if (hasOverlay_ && !overlayTimeline_.isEmpty()) {
+        if (!initOverlayPipeline(env, w, h)) {
+            LOGW("RenderEngine: overlay init failed, proceeding with primary only");
+        }
+    }
+    // buildRenderTree 会根据 overlay 是否初始化来决定渲染树拓扑
+    // 需要延迟到 surface 尺寸已知后调用，这里先跳过
+    // renderThreadFunc 中会在获得 surfaceWidth/Height 后调用
 
     // 如果 trimIn > 0，seek 到起始位置
     if (firstClip.trimIn > 0) {
@@ -343,6 +416,14 @@ void RenderEngine::releaseDecodePipeline(JNIEnv* env) {
     audioDecoder_.release();
     hasAudio_ = false;
 
+    // Clean up render tree + overlay before primary
+    if (blendNode_) {
+        blendNode_->releaseGL();
+        delete blendNode_;
+        blendNode_ = nullptr;
+    }
+    releaseOverlayPipeline(env);
+
     delete outputNode_;  outputNode_ = nullptr;
     delete sourceNode_;  sourceNode_ = nullptr;
 
@@ -356,6 +437,103 @@ void RenderEngine::releaseDecodePipeline(JNIEnv* env) {
 
     pipelineInitialized_ = false;
     LOGI("RenderEngine: pipeline released");
+}
+
+bool RenderEngine::initOverlayPipeline(JNIEnv* env, int surfaceWidth, int surfaceHeight) {
+    releaseOverlayPipeline(env);
+
+    if (overlayTimeline_.isEmpty()) return false;
+
+    const Clip& firstClip = overlayTimeline_.clipAt(0);
+    if (!overlayDemuxer_.open(firstClip.sourcePath.c_str())) {
+        LOGE("initOverlayPipeline: failed to open %s", firstClip.sourcePath.c_str());
+        return false;
+    }
+
+    if (!overlayStHelper_.create(env)) {
+        LOGE("initOverlayPipeline: SurfaceTexture create failed");
+        overlayDemuxer_.close();
+        return false;
+    }
+
+    if (!overlayHwDecoder_.init(overlayDemuxer_.videoCodecParameters(), overlayStHelper_.nativeWindow())) {
+        LOGE("initOverlayPipeline: HwDecoder init failed");
+        overlayStHelper_.release(env);
+        overlayDemuxer_.close();
+        return false;
+    }
+
+    overlayDecoderConfig_ = DecoderConfig::fromCodecParameters(overlayDemuxer_.videoCodecParameters());
+    overlayActiveClipIndex_ = 0;
+    overlaySkipUntilPtsUs_ = firstClip.trimIn;
+
+    int w = overlayDemuxer_.videoWidth();
+    int h = overlayDemuxer_.videoHeight();
+
+    overlaySourceNode_ = new SourceNode(&overlayStHelper_, env);
+    if (!overlaySourceNode_->initGL(w, h)) {
+        LOGE("initOverlayPipeline: SourceNode GL init failed");
+        delete overlaySourceNode_;
+        overlaySourceNode_ = nullptr;
+        overlayHwDecoder_.release();
+        overlayStHelper_.release(env);
+        overlayDemuxer_.close();
+        return false;
+    }
+
+    if (firstClip.trimIn > 0) {
+        overlayDemuxer_.seek(firstClip.trimIn);
+    }
+
+    overlayInitialized_ = true;
+    LOGI("initOverlayPipeline: initialized %dx%d, alpha=%.2f", w, h, overlayAlpha_.load());
+    return true;
+}
+
+void RenderEngine::releaseOverlayPipeline(JNIEnv* env) {
+    if (!overlayInitialized_) return;
+
+    delete overlaySourceNode_;  overlaySourceNode_ = nullptr;
+
+    overlayHwDecoder_.release();
+    overlayStHelper_.release(env);
+    overlayDemuxer_.close();
+
+    overlayActiveClipIndex_ = -1;
+    overlayDecoderConfig_ = DecoderConfig{};
+    overlaySkipUntilPtsUs_ = 0;
+    overlayInitialized_ = false;
+    LOGI("releaseOverlayPipeline: released");
+}
+
+void RenderEngine::buildRenderTree(int surfaceWidth, int surfaceHeight) {
+    // Clean up old tree connections (nodes themselves are managed separately)
+    if (outputNode_) {
+        outputNode_->inputs.clear();
+    }
+    if (blendNode_) {
+        blendNode_->releaseGL();
+        delete blendNode_;
+        blendNode_ = nullptr;
+    }
+
+    if (!sourceNode_ || !outputNode_) return;
+
+    if (overlayInitialized_ && overlaySourceNode_) {
+        // 2 tracks: OutputNode → BlendNode → [SourceNode(primary), SourceNode(overlay)]
+        blendNode_ = new BlendNode();
+        blendNode_->initGL(surfaceWidth, surfaceHeight);
+        blendNode_->overlayAlpha = overlayAlpha_.load();
+        blendNode_->inputs.push_back(sourceNode_);
+        blendNode_->inputs.push_back(overlaySourceNode_);
+        outputNode_->inputs.push_back(blendNode_);
+        LOGI("buildRenderTree: OutputNode → BlendNode → [Primary, Overlay(alpha=%.2f)]",
+             overlayAlpha_.load());
+    } else {
+        // 1 track: OutputNode → SourceNode
+        outputNode_->inputs.push_back(sourceNode_);
+        LOGI("buildRenderTree: OutputNode → SourceNode (single track)");
+    }
 }
 
 // ============================================================
@@ -470,6 +648,11 @@ void RenderEngine::renderThreadFunc() {
     AVPacket* pkt = av_packet_alloc();
     bool hasPendingPkt = false;
 
+    // 叠加轨道 packet
+    overlayPkt_ = av_packet_alloc();
+    overlayHasPendingPkt_ = false;
+    overlayEof_ = false;
+
     // ============================================================
     // FFplay frame_timer + compute_target_delay 同步变量
     //
@@ -521,11 +704,16 @@ void RenderEngine::renderThreadFunc() {
                     hasPendingPkt = false;
                 }
                 if (initDecodePipeline(env)) {
+                    buildRenderTree(surfaceWidth, surfaceHeight);
                     frameTimerValid = false;
                     lastFramePtsUs = -1;
                     consecutiveDrops = 0;
                     eof = false;
-                    LOGI("RenderEngine: ready, fps=%.1f", demuxer_.fps());
+                    overlayEof_ = false;
+                    if (overlayPkt_) { av_packet_unref(overlayPkt_); }
+                    overlayHasPendingPkt_ = false;
+                    LOGI("RenderEngine: ready, fps=%.1f, overlay=%s",
+                         demuxer_.fps(), overlayInitialized_ ? "yes" : "no");
                     LOGI("AVSYNC transition source-ready generation=%u audio=%d",
                          transitionGeneration, hasAudio_ ? 1 : 0);
                 }
@@ -596,6 +784,56 @@ void RenderEngine::renderThreadFunc() {
                         currentPositionUs_.store(framePtsUs);
                     }
 
+                    // 叠加轨道 seek（best-effort）
+                    if (overlayInitialized_ && overlaySourceNode_) {
+                        ClipLookup oLookup = overlayTimeline_.resolve(fastTarget);
+                        if (oLookup.clipIndex >= 0) {
+                            // 叠加轨道在此位置有内容
+                            if (oLookup.clipIndex != overlayActiveClipIndex_) {
+                                overlayDemuxer_.close();
+                                const Clip& oClip = overlayTimeline_.clipAt(oLookup.clipIndex);
+                                overlayDemuxer_.open(oClip.sourcePath.c_str());
+                                overlayActiveClipIndex_ = oLookup.clipIndex;
+                                DecoderConfig newCfg = DecoderConfig::fromCodecParameters(overlayDemuxer_.videoCodecParameters());
+                                if (!(newCfg == overlayDecoderConfig_)) {
+                                    overlayHwDecoder_.release();
+                                    overlayHwDecoder_.init(overlayDemuxer_.videoCodecParameters(), overlayStHelper_.nativeWindow());
+                                    overlayDecoderConfig_ = newCfg;
+                                } else {
+                                    overlayHwDecoder_.flush();
+                                }
+                            }
+                            overlayDemuxer_.seek(oLookup.sourcePositionUs);
+                            overlayHwDecoder_.flush();
+                            if (overlayHasPendingPkt_) { av_packet_unref(overlayPkt_); overlayHasPendingPkt_ = false; }
+                            overlayEof_ = false;
+
+                            AVRational oTb = overlayDemuxer_.videoTimeBase();
+                            for (int oa = 0; oa < 50; oa++) {
+                                if (!overlayHasPendingPkt_) {
+                                    if (!overlayDemuxer_.readVideoPacket(overlayPkt_)) break;
+                                    overlayHasPendingPkt_ = true;
+                                }
+                                if (overlayHwDecoder_.queuePacketWithTimeout(overlayPkt_, 10000)) {
+                                    av_packet_unref(overlayPkt_);
+                                    overlayHasPendingPkt_ = false;
+                                }
+                                HwDecoder::DecodedFrame oFrame;
+                                if (overlayHwDecoder_.dequeueOutput(oFrame, 5000)) {
+                                    overlayHwDecoder_.releaseOutput(oFrame.bufferIndex, true);
+                                    overlayStHelper_.waitForFrame(50);
+                                    overlayStHelper_.consumeFrameAvailable();
+                                    overlayStHelper_.updateTexImage(env);
+                                    overlaySourceNode_->setActive(true);
+                                    break;
+                                }
+                            }
+                        } else {
+                            overlaySourceNode_->setActive(false);
+                        }
+                    }
+
+                    if (blendNode_) blendNode_->overlayAlpha = overlayAlpha_.load();
                     outputNode_->outputWidth = surfaceWidth;
                     outputNode_->outputHeight = surfaceHeight;
                     outputNode_->execute(framePtsUs);
@@ -686,6 +924,55 @@ void RenderEngine::renderThreadFunc() {
                         currentPositionUs_.store(framePtsUs);
                     }
 
+                    // 叠加轨道精确 seek（复用 seekFast 逻辑，best-effort）
+                    if (overlayInitialized_ && overlaySourceNode_) {
+                        ClipLookup oLookup = overlayTimeline_.resolve(seekTarget);
+                        if (oLookup.clipIndex >= 0) {
+                            if (oLookup.clipIndex != overlayActiveClipIndex_) {
+                                overlayDemuxer_.close();
+                                const Clip& oClip = overlayTimeline_.clipAt(oLookup.clipIndex);
+                                overlayDemuxer_.open(oClip.sourcePath.c_str());
+                                overlayActiveClipIndex_ = oLookup.clipIndex;
+                                DecoderConfig newCfg = DecoderConfig::fromCodecParameters(overlayDemuxer_.videoCodecParameters());
+                                if (!(newCfg == overlayDecoderConfig_)) {
+                                    overlayHwDecoder_.release();
+                                    overlayHwDecoder_.init(overlayDemuxer_.videoCodecParameters(), overlayStHelper_.nativeWindow());
+                                    overlayDecoderConfig_ = newCfg;
+                                } else {
+                                    overlayHwDecoder_.flush();
+                                }
+                            } else {
+                                overlayHwDecoder_.flush();
+                            }
+                            overlayDemuxer_.seek(oLookup.sourcePositionUs);
+                            if (overlayHasPendingPkt_) { av_packet_unref(overlayPkt_); overlayHasPendingPkt_ = false; }
+                            overlayEof_ = false;
+
+                            for (int oa = 0; oa < 50; oa++) {
+                                if (!overlayHasPendingPkt_) {
+                                    if (!overlayDemuxer_.readVideoPacket(overlayPkt_)) break;
+                                    overlayHasPendingPkt_ = true;
+                                }
+                                if (overlayHwDecoder_.queuePacketWithTimeout(overlayPkt_, 10000)) {
+                                    av_packet_unref(overlayPkt_);
+                                    overlayHasPendingPkt_ = false;
+                                }
+                                HwDecoder::DecodedFrame oFrame;
+                                if (overlayHwDecoder_.dequeueOutput(oFrame, 5000)) {
+                                    overlayHwDecoder_.releaseOutput(oFrame.bufferIndex, true);
+                                    overlayStHelper_.waitForFrame(50);
+                                    overlayStHelper_.consumeFrameAvailable();
+                                    overlayStHelper_.updateTexImage(env);
+                                    overlaySourceNode_->setActive(true);
+                                    break;
+                                }
+                            }
+                        } else {
+                            overlaySourceNode_->setActive(false);
+                        }
+                    }
+
+                    if (blendNode_) blendNode_->overlayAlpha = overlayAlpha_.load();
                     outputNode_->outputWidth = surfaceWidth;
                     outputNode_->outputHeight = surfaceHeight;
                     outputNode_->execute(framePtsUs);
@@ -762,6 +1049,28 @@ void RenderEngine::renderThreadFunc() {
                     audioOutput_.flush();
                 }
                 skipUntilPtsUs_ = startPos;
+            }
+            // 重置叠加轨道
+            if (overlayInitialized_) {
+                overlayHwDecoder_.flush();
+                if (overlayHasPendingPkt_) { av_packet_unref(overlayPkt_); overlayHasPendingPkt_ = false; }
+                overlayEof_ = false;
+                if (!overlayTimeline_.isEmpty()) {
+                    const Clip& oFirst = overlayTimeline_.clipAt(0);
+                    if (overlayActiveClipIndex_ != 0) {
+                        overlayDemuxer_.close();
+                        overlayDemuxer_.open(oFirst.sourcePath.c_str());
+                        overlayActiveClipIndex_ = 0;
+                        DecoderConfig newCfg = DecoderConfig::fromCodecParameters(overlayDemuxer_.videoCodecParameters());
+                        if (!(newCfg == overlayDecoderConfig_)) {
+                            overlayHwDecoder_.release();
+                            overlayHwDecoder_.init(overlayDemuxer_.videoCodecParameters(), overlayStHelper_.nativeWindow());
+                            overlayDecoderConfig_ = newCfg;
+                        }
+                    }
+                    overlayDemuxer_.seek(oFirst.trimIn);
+                    overlaySkipUntilPtsUs_ = oFirst.trimIn;
+                }
             }
             currentPositionUs_.store(0);
             frameTimerValid = false;
@@ -853,11 +1162,97 @@ void RenderEngine::renderThreadFunc() {
         int64_t updateEndUs = steadyNowUs();
 
         // 更新全局位置
+        int64_t globalPosUs = framePtsUs;
         if (!timeline_.isEmpty() && activeClipIndex_ >= 0) {
             const Clip& clip = timeline_.clipAt(activeClipIndex_);
-            currentPositionUs_.store(clip.inPoint + (framePtsUs - clip.trimIn));
-        } else {
-            currentPositionUs_.store(framePtsUs);
+            globalPosUs = clip.inPoint + (framePtsUs - clip.trimIn);
+        }
+        currentPositionUs_.store(globalPosUs);
+
+        // 第 3.5 步：叠加轨道帧同步（best-effort）
+        if (overlayInitialized_ && overlaySourceNode_) {
+            do {  // do-once block for easy break on failure
+                ClipLookup oLookup = overlayTimeline_.resolve(globalPosUs);
+                if (oLookup.clipIndex < 0) {
+                    overlaySourceNode_->setActive(false);
+                    break;
+                }
+
+                // 切片段
+                if (oLookup.clipIndex != overlayActiveClipIndex_) {
+                    overlayDemuxer_.close();
+                    const Clip& oClip = overlayTimeline_.clipAt(oLookup.clipIndex);
+                    if (!overlayDemuxer_.open(oClip.sourcePath.c_str())) {
+                        overlaySourceNode_->setActive(false);
+                        break;
+                    }
+                    overlayActiveClipIndex_ = oLookup.clipIndex;
+                    overlaySkipUntilPtsUs_ = oClip.trimIn;
+                    DecoderConfig newCfg = DecoderConfig::fromCodecParameters(overlayDemuxer_.videoCodecParameters());
+                    if (!(newCfg == overlayDecoderConfig_)) {
+                        overlayHwDecoder_.release();
+                        overlayHwDecoder_.init(overlayDemuxer_.videoCodecParameters(), overlayStHelper_.nativeWindow());
+                        overlayDecoderConfig_ = newCfg;
+                    } else {
+                        overlayHwDecoder_.flush();
+                    }
+                    overlayDemuxer_.seek(oLookup.sourcePositionUs);
+                    if (overlayHasPendingPkt_) { av_packet_unref(overlayPkt_); overlayHasPendingPkt_ = false; }
+                    overlayEof_ = false;
+
+                    int ow = overlayDemuxer_.videoWidth();
+                    int oh = overlayDemuxer_.videoHeight();
+                    if (ow != overlaySourceNode_->outputWidth || oh != overlaySourceNode_->outputHeight) {
+                        overlaySourceNode_->releaseGL();
+                        overlaySourceNode_->initGL(ow, oh);
+                    }
+                }
+
+                // 非阻塞喂包
+                if (!overlayEof_) {
+                    for (int i = 0; i < 3; i++) {
+                        if (!overlayHasPendingPkt_) {
+                            if (!overlayDemuxer_.readVideoPacket(overlayPkt_)) {
+                                overlayEof_ = true;
+                                break;
+                            }
+                            overlayHasPendingPkt_ = true;
+                        }
+                        if (overlayHwDecoder_.tryQueuePacket(overlayPkt_)) {
+                            av_packet_unref(overlayPkt_);
+                            overlayHasPendingPkt_ = false;
+                        } else {
+                            break;
+                        }
+                    }
+                }
+
+                // 取帧（5ms 短超时，best-effort）
+                HwDecoder::DecodedFrame oFrame;
+                if (overlayHwDecoder_.dequeueOutput(oFrame, 5000)) {
+                    AVRational oTb = overlayDemuxer_.videoTimeBase();
+                    int64_t oPtsUs = av_rescale_q(oFrame.pts, oTb, {1, 1000000});
+
+                    if (oPtsUs < overlaySkipUntilPtsUs_) {
+                        overlayHwDecoder_.releaseOutput(oFrame.bufferIndex, false);
+                    } else if (!overlayTimeline_.isEmpty() && overlayActiveClipIndex_ >= 0
+                               && oPtsUs >= overlayTimeline_.clipAt(overlayActiveClipIndex_).trimOut) {
+                        overlayHwDecoder_.releaseOutput(oFrame.bufferIndex, false);
+                        int oNext = overlayActiveClipIndex_ + 1;
+                        if (oNext >= overlayTimeline_.clipCount()) {
+                            overlayEof_ = true;
+                            overlaySourceNode_->setActive(false);
+                        }
+                    } else {
+                        overlayHwDecoder_.releaseOutput(oFrame.bufferIndex, true);
+                        overlayStHelper_.waitForFrame(30);
+                        overlayStHelper_.consumeFrameAvailable();
+                        overlayStHelper_.updateTexImage(env);
+                        overlaySourceNode_->setActive(true);
+                    }
+                }
+                // 取不到帧时不改 active 状态，保留上一帧纹理
+            } while (false);
         }
 
         // =============================================
@@ -974,6 +1369,7 @@ void RenderEngine::renderThreadFunc() {
         // 第 5 步：渲染（通过渲染树）
         int64_t executeStartUs = steadyNowUs();
         if (shouldRender) {
+            if (blendNode_) blendNode_->overlayAlpha = overlayAlpha_.load();
             outputNode_->outputWidth = surfaceWidth;
             outputNode_->outputHeight = surfaceHeight;
             outputNode_->execute(framePtsUs);
@@ -1024,6 +1420,9 @@ void RenderEngine::renderThreadFunc() {
     // 清理资源
     if (hasPendingPkt) av_packet_unref(pkt);
     av_packet_free(&pkt);
+    if (overlayHasPendingPkt_) av_packet_unref(overlayPkt_);
+    av_packet_free(&overlayPkt_);
+    overlayHasPendingPkt_ = false;
 
     releaseDecodePipeline(env);
 

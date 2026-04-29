@@ -29,6 +29,7 @@ set(SOURCES
     src/main/cpp/decode/AudioDecoder.cpp
     src/main/cpp/core/SourceNode.cpp
     src/main/cpp/core/OutputNode.cpp
+    src/main/cpp/core/BlendNode.cpp
     src/main/cpp/audio/AudioOutput.cpp
     src/main/cpp/engine/RenderEngine.cpp
     src/main/cpp/engine/Timeline.cpp

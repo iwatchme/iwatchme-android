@@ -81,6 +81,7 @@ void SourceNode::releaseGL() {
 }
 
 GLuint SourceNode::execute(int64_t /* timelinePositionUs */) {
+    if (!active_) return 0;
     if (!stHelper_ || !fbo_) return 0;
 
     // Get the texture transform matrix from SurfaceTexture

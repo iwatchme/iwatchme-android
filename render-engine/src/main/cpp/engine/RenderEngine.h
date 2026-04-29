@@ -15,6 +15,7 @@
 #include "audio/AudioOutput.h"
 #include "core/SourceNode.h"
 #include "core/OutputNode.h"
+#include "core/BlendNode.h"
 #include "engine/Timeline.h"
 
 // 播放事件回调接口
@@ -32,6 +33,9 @@ public:
     void setSurface(ANativeWindow* window);
     bool setVideoSource(const std::string& filePath);
     bool setTimeline(std::vector<Clip> clips);
+    bool setMultiTrackTimeline(std::vector<Clip> primaryClips,
+                               std::vector<Clip> overlayClips,
+                               float overlayAlpha);
 
     void play();
     void pause();
@@ -43,6 +47,7 @@ public:
     int getVideoWidth() const;
     int getVideoHeight() const;
 
+    void setOverlayAlpha(float alpha);
     void setCallback(PlaybackCallback* cb) { callback_ = cb; }
 
 private:
@@ -56,6 +61,9 @@ private:
 
     bool initDecodePipeline(JNIEnv* env);
     void releaseDecodePipeline(JNIEnv* env);
+    bool initOverlayPipeline(JNIEnv* env, int surfaceWidth, int surfaceHeight);
+    void releaseOverlayPipeline(JNIEnv* env);
+    void buildRenderTree(int surfaceWidth, int surfaceHeight);
 
     JavaVM* jvm_;
     EglCore eglCore_;
@@ -70,11 +78,28 @@ private:
     std::mutex videoSourceMutex_;
     std::atomic<bool> videoSourceChanged_{false};
 
-    // 多片段时间线
+    // 主轨道时间线
     Timeline timeline_;
     int activeClipIndex_ = -1;
     DecoderConfig activeDecoderConfig_;
     int64_t skipUntilPtsUs_ = 0;
+
+    // 叠加轨道（overlay track）
+    Demuxer overlayDemuxer_;
+    HwDecoder overlayHwDecoder_;
+    SurfaceTextureHelper overlayStHelper_;
+    SourceNode* overlaySourceNode_ = nullptr;
+    BlendNode* blendNode_ = nullptr;
+    Timeline overlayTimeline_;
+    int overlayActiveClipIndex_ = -1;
+    DecoderConfig overlayDecoderConfig_;
+    int64_t overlaySkipUntilPtsUs_ = 0;
+    bool overlayInitialized_ = false;
+    std::atomic<float> overlayAlpha_{0.5f};
+    bool hasOverlay_ = false;  // 是否设置了叠加轨道
+    AVPacket* overlayPkt_ = nullptr;
+    bool overlayHasPendingPkt_ = false;
+    bool overlayEof_ = false;
 
     // 视频解码
     HwDecoder hwDecoder_;

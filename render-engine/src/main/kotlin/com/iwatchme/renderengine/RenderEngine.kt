@@ -10,6 +10,11 @@ data class VideoClip(
     val trimOutUs: Long = -1  // -1 = 使用完整时长
 )
 
+data class VideoTrack(
+    val clips: List<VideoClip>,
+    val alpha: Float = 1.0f
+)
+
 class RenderEngine {
 
     companion object {
@@ -51,11 +56,27 @@ class RenderEngine {
      * 设置多片段时间线，替代 setVideoSource 用于多片段拼接播放。
      */
     fun setTimeline(clips: List<VideoClip>): Boolean {
-        if (nativeHandle == 0L || clips.isEmpty()) return false
-        val paths = clips.map { it.sourcePath }.toTypedArray()
-        val trimIns = clips.map { it.trimInUs }.toLongArray()
-        val trimOuts = clips.map { it.trimOutUs }.toLongArray()
-        return nativeSetTimeline(nativeHandle, paths, trimIns, trimOuts)
+        return setMultiTrackTimeline(listOf(VideoTrack(clips, 1.0f)))
+    }
+
+    /**
+     * 设置多轨道时间线：primaryTrack + overlay tracks。
+     * tracks[0] = 主轨道, tracks[1] = 叠加轨道 (目前只支持 1 个叠加轨道)。
+     */
+    fun setMultiTrackTimeline(tracks: List<VideoTrack>): Boolean {
+        if (nativeHandle == 0L || tracks.isEmpty()) return false
+        val trackCount = tracks.size
+        val clipCounts = tracks.map { it.clips.size }.toIntArray()
+        val allPaths = tracks.flatMap { t -> t.clips.map { it.sourcePath } }.toTypedArray()
+        val allTrimIns = tracks.flatMap { t -> t.clips.map { it.trimInUs } }.toLongArray()
+        val allTrimOuts = tracks.flatMap { t -> t.clips.map { it.trimOutUs } }.toLongArray()
+        val overlayAlpha = if (tracks.size > 1) tracks[1].alpha else 1.0f
+        return nativeSetMultiTrackTimeline(nativeHandle, trackCount, clipCounts,
+                                            allPaths, allTrimIns, allTrimOuts, overlayAlpha)
+    }
+
+    fun setOverlayAlpha(alpha: Float) {
+        if (nativeHandle != 0L) nativeSetOverlayAlpha(nativeHandle, alpha)
     }
 
     fun play() {
@@ -113,6 +134,8 @@ class RenderEngine {
     private external fun nativeSetSurface(handle: Long, surface: Surface?)
     private external fun nativeSetVideoSource(handle: Long, filePath: String): Boolean
     private external fun nativeSetTimeline(handle: Long, paths: Array<String>, trimIns: LongArray, trimOuts: LongArray): Boolean
+    private external fun nativeSetMultiTrackTimeline(handle: Long, trackCount: Int, clipCounts: IntArray, allPaths: Array<String>, allTrimIns: LongArray, allTrimOuts: LongArray, overlayAlpha: Float): Boolean
+    private external fun nativeSetOverlayAlpha(handle: Long, alpha: Float)
     private external fun nativePlay(handle: Long)
     private external fun nativePause(handle: Long)
     private external fun nativeSeek(handle: Long, positionUs: Long)
