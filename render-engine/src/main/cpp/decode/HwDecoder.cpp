@@ -141,10 +141,22 @@ void HwDecoder::release() {
     dequeuedCount_ = 0;
 }
 
-bool HwDecoder::queuePacket(AVPacket* packet) {
+bool HwDecoder::tryQueuePacket(AVPacket* packet) {
+    // steady-state 播放态必须是 opportunistic pump：
+    // 能喂就喂，不能喂就立刻返回，把时间留给 drain/output/render。
+    return queuePacketInternal(packet, 0);
+}
+
+bool HwDecoder::queuePacketWithTimeout(AVPacket* packet, int64_t timeoutUs) {
+    // seek / 首帧预热允许 bounded blocking，因为目标是尽快拿到目标帧，
+    // 而不是维持稳定帧节奏。
+    return queuePacketInternal(packet, timeoutUs);
+}
+
+bool HwDecoder::queuePacketInternal(AVPacket* packet, int64_t timeoutUs) {
     if (!codec_) return false;
 
-    ssize_t bufIdx = AMediaCodec_dequeueInputBuffer(codec_, 50000);
+    ssize_t bufIdx = AMediaCodec_dequeueInputBuffer(codec_, timeoutUs);
     if (bufIdx < 0) return false;
 
     size_t bufSize = 0;
@@ -180,23 +192,20 @@ void HwDecoder::queueEOS() {
     }
 }
 
-int64_t HwDecoder::dequeueAndRender(int64_t timeoutUs) {
-    if (!codec_) return -1;
+// ---- 两步 API ----
+
+bool HwDecoder::dequeueOutput(DecodedFrame& outFrame, int64_t timeoutUs) {
+    if (!codec_) return false;
 
     for (int attempt = 0; attempt < 3; attempt++) {
         AMediaCodecBufferInfo info;
         ssize_t bufIdx = AMediaCodec_dequeueOutputBuffer(codec_, &info, timeoutUs);
 
         if (bufIdx >= 0) {
-            int64_t pts = info.presentationTimeUs;
-            // Release buffer and render to the output Surface (SurfaceTexture)
-            AMediaCodec_releaseOutputBuffer(codec_, bufIdx, true);
-
-            if (dequeuedCount_ < 3) {
-                LOGI("HwDecoder: rendered frame #%d pts=%lld", dequeuedCount_, (long long)pts);
-            }
+            outFrame.bufferIndex = (int32_t)bufIdx;
+            outFrame.pts = info.presentationTimeUs;
             dequeuedCount_++;
-            return pts;
+            return true;
         }
 
         if (bufIdx == AMEDIACODEC_INFO_OUTPUT_FORMAT_CHANGED) {
@@ -217,7 +226,21 @@ int64_t HwDecoder::dequeueAndRender(int64_t timeoutUs) {
         break;
     }
 
-    return -1;
+    return false;
+}
+
+void HwDecoder::releaseOutput(int32_t bufferIndex, bool render) {
+    if (!codec_ || bufferIndex < 0) return;
+    AMediaCodec_releaseOutputBuffer(codec_, bufferIndex, render);
+}
+
+// ---- 便捷 API（始终 render=true）----
+
+int64_t HwDecoder::dequeueAndRender(int64_t timeoutUs) {
+    DecodedFrame frame;
+    if (!dequeueOutput(frame, timeoutUs)) return -1;
+    releaseOutput(frame.bufferIndex, true);
+    return frame.pts;
 }
 
 void HwDecoder::flush() {

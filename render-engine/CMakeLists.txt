@@ -26,8 +26,10 @@ set(SOURCES
     src/main/cpp/decode/Demuxer.cpp
     src/main/cpp/decode/HwDecoder.cpp
     src/main/cpp/decode/SurfaceTextureHelper.cpp
+    src/main/cpp/decode/AudioDecoder.cpp
     src/main/cpp/core/SourceNode.cpp
     src/main/cpp/core/OutputNode.cpp
+    src/main/cpp/audio/AudioOutput.cpp
     src/main/cpp/engine/RenderEngine.cpp
 )
 
@@ -39,6 +41,7 @@ target_include_directories(render-engine PRIVATE
     src/main/cpp/gl
     src/main/cpp/decode
     src/main/cpp/core
+    src/main/cpp/audio
     src/main/cpp/engine
 )
 
@@ -56,4 +59,5 @@ target_link_libraries(render-engine
     ${egl-lib}
     ${gles3-lib}
     ${mediandk-lib}
+    aaudio
 )

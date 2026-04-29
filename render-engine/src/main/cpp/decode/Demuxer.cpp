@@ -12,7 +12,6 @@ bool Demuxer::initBitstreamFilter() {
     const char* bsfName = nullptr;
 
     if (par->codec_id == AV_CODEC_ID_H264) {
-        // Check if extradata is AVCC format (not Annex B)
         if (par->extradata && par->extradata_size >= 4 &&
             !(par->extradata[0] == 0 && par->extradata[1] == 0 &&
               (par->extradata[2] == 1 || (par->extradata[2] == 0 && par->extradata[3] == 1)))) {
@@ -27,8 +26,8 @@ bool Demuxer::initBitstreamFilter() {
     }
 
     if (!bsfName) {
-        LOGI("Demuxer: no bitstream filter needed (already Annex B or unsupported codec)");
-        return true;  // Not an error — stream may already be Annex B
+        LOGI("Demuxer: no bitstream filter needed");
+        return true;
     }
 
     const AVBitStreamFilter* bsf = av_bsf_get_by_name(bsfName);
@@ -38,30 +37,28 @@ bool Demuxer::initBitstreamFilter() {
     }
 
     int ret = av_bsf_alloc(bsf, &bsfCtx_);
-    if (ret < 0) {
-        LOGE("Demuxer: av_bsf_alloc failed: %d", ret);
-        return false;
-    }
+    if (ret < 0) return false;
 
     ret = avcodec_parameters_copy(bsfCtx_->par_in, par);
-    if (ret < 0) {
-        LOGE("Demuxer: avcodec_parameters_copy to bsf failed: %d", ret);
-        av_bsf_free(&bsfCtx_);
-        return false;
-    }
+    if (ret < 0) { av_bsf_free(&bsfCtx_); return false; }
 
     bsfCtx_->time_base_in = formatCtx_->streams[videoStreamIndex_]->time_base;
 
     ret = av_bsf_init(bsfCtx_);
-    if (ret < 0) {
-        LOGE("Demuxer: av_bsf_init failed: %d", ret);
-        av_bsf_free(&bsfCtx_);
-        return false;
-    }
+    if (ret < 0) { av_bsf_free(&bsfCtx_); return false; }
 
-    LOGI("Demuxer: bitstream filter '%s' initialized, extradata_size: %d -> %d",
-         bsfName, par->extradata_size, bsfCtx_->par_out->extradata_size);
+    LOGI("Demuxer: bitstream filter '%s' initialized", bsfName);
     return true;
+}
+
+bool Demuxer::applyBsf(AVPacket* packet) {
+    if (!bsfCtx_) return true;
+
+    int ret = av_bsf_send_packet(bsfCtx_, packet);
+    if (ret < 0) return false;
+
+    ret = av_bsf_receive_packet(bsfCtx_, packet);
+    return ret >= 0;
 }
 
 bool Demuxer::open(const char* filePath) {
@@ -76,76 +73,166 @@ bool Demuxer::open(const char* filePath) {
     }
 
     ret = avformat_find_stream_info(formatCtx_, nullptr);
-    if (ret < 0) {
-        LOGE("Demuxer: avformat_find_stream_info failed");
-        close();
-        return false;
-    }
+    if (ret < 0) { close(); return false; }
 
-    videoStreamIndex_ = av_find_best_stream(formatCtx_, AVMEDIA_TYPE_VIDEO,
-                                             -1, -1, nullptr, 0);
+    // 查找视频流
+    videoStreamIndex_ = av_find_best_stream(formatCtx_, AVMEDIA_TYPE_VIDEO, -1, -1, nullptr, 0);
     if (videoStreamIndex_ < 0) {
         LOGE("Demuxer: no video stream found");
         close();
         return false;
     }
 
-    AVStream* stream = formatCtx_->streams[videoStreamIndex_];
+    // 查找音频流
+    audioStreamIndex_ = av_find_best_stream(formatCtx_, AVMEDIA_TYPE_AUDIO, -1, -1, nullptr, 0);
+
+    AVStream* vs = formatCtx_->streams[videoStreamIndex_];
     LOGI("Demuxer: opened %s", filePath);
     LOGI("  video: %dx%d, codec=%d, duration=%.2fs, fps=%.2f",
-         stream->codecpar->width, stream->codecpar->height,
-         stream->codecpar->codec_id,
+         vs->codecpar->width, vs->codecpar->height,
+         vs->codecpar->codec_id,
          (double)durationUs() / 1000000.0, fps());
 
-    // Initialize bitstream filter for AVCC -> Annex B conversion
-    if (!initBitstreamFilter()) {
-        LOGE("Demuxer: failed to init bitstream filter");
-        close();
-        return false;
+    if (audioStreamIndex_ >= 0) {
+        AVStream* as = formatCtx_->streams[audioStreamIndex_];
+        LOGI("  audio: %dHz, %dch, codec=%d",
+             as->codecpar->sample_rate, as->codecpar->ch_layout.nb_channels,
+             as->codecpar->codec_id);
+    } else {
+        LOGI("  audio: none");
     }
+
+    if (!initBitstreamFilter()) { close(); return false; }
 
     return true;
 }
 
 void Demuxer::close() {
-    if (bsfCtx_) {
-        av_bsf_free(&bsfCtx_);
-        bsfCtx_ = nullptr;
-    }
-    if (formatCtx_) {
-        avformat_close_input(&formatCtx_);
-        formatCtx_ = nullptr;
-    }
+    flushPacketQueues();
+    if (bsfCtx_) { av_bsf_free(&bsfCtx_); bsfCtx_ = nullptr; }
+    if (formatCtx_) { avformat_close_input(&formatCtx_); formatCtx_ = nullptr; }
     videoStreamIndex_ = -1;
+    audioStreamIndex_ = -1;
+}
+
+void Demuxer::flushPacketQueues() {
+    for (auto* pkt : videoPacketQueue_) {
+        av_packet_unref(pkt);
+        av_packet_free(&pkt);
+    }
+    videoPacketQueue_.clear();
+    for (auto* pkt : audioPacketQueue_) {
+        av_packet_unref(pkt);
+        av_packet_free(&pkt);
+    }
+    audioPacketQueue_.clear();
+}
+
+Demuxer::PacketType Demuxer::readPacket(AVPacket* packet) {
+    while (true) {
+        int ret = av_read_frame(formatCtx_, packet);
+        if (ret < 0) return PacketType::Eof;
+
+        if (packet->stream_index == videoStreamIndex_) {
+            // 对视频 packet 应用 BSF（AVCC → Annex B）
+            if (bsfCtx_) {
+                ret = av_bsf_send_packet(bsfCtx_, packet);
+                if (ret < 0) { av_packet_unref(packet); continue; }
+                ret = av_bsf_receive_packet(bsfCtx_, packet);
+                if (ret < 0) {
+                    if (ret == AVERROR(EAGAIN)) continue;
+                    return PacketType::Eof;
+                }
+            }
+            return PacketType::Video;
+        }
+
+        if (packet->stream_index == audioStreamIndex_) {
+            return PacketType::Audio;
+        }
+
+        av_packet_unref(packet);  // 跳过其他流
+    }
 }
 
 bool Demuxer::readVideoPacket(AVPacket* packet) {
+    // 先从缓存队列取
+    if (!videoPacketQueue_.empty()) {
+        AVPacket* cached = videoPacketQueue_.front();
+        videoPacketQueue_.pop_front();
+        av_packet_move_ref(packet, cached);
+        av_packet_free(&cached);
+        return true;
+    }
+
+    // 从文件读，遇到音频包则缓存到 audioQueue_
     while (true) {
         int ret = av_read_frame(formatCtx_, packet);
-        if (ret < 0) {
-            return false;  // EOF or error
+        if (ret < 0) return false;
+
+        if (packet->stream_index == videoStreamIndex_) {
+            if (bsfCtx_) {
+                ret = av_bsf_send_packet(bsfCtx_, packet);
+                if (ret < 0) { av_packet_unref(packet); continue; }
+                ret = av_bsf_receive_packet(bsfCtx_, packet);
+                if (ret < 0) {
+                    if (ret == AVERROR(EAGAIN)) continue;
+                    return false;
+                }
+            }
+            return true;
         }
-        if (packet->stream_index != videoStreamIndex_) {
-            av_packet_unref(packet);  // Skip non-video packets
+
+        if (packet->stream_index == audioStreamIndex_) {
+            // 缓存音频包，给音频线程用
+            AVPacket* cached = av_packet_alloc();
+            av_packet_move_ref(cached, packet);
+            audioPacketQueue_.push_back(cached);
             continue;
         }
 
-        // Apply bitstream filter if active (AVCC -> Annex B)
-        if (bsfCtx_) {
-            ret = av_bsf_send_packet(bsfCtx_, packet);
-            if (ret < 0) {
-                av_packet_unref(packet);
-                continue;
-            }
-            ret = av_bsf_receive_packet(bsfCtx_, packet);
-            if (ret < 0) {
-                // EAGAIN means bsf needs more input; loop to read next frame
-                if (ret == AVERROR(EAGAIN)) continue;
-                return false;
-            }
+        av_packet_unref(packet);  // 跳过其他流
+    }
+}
+
+bool Demuxer::readAudioPacket(AVPacket* packet) {
+    // 先从缓存队列取
+    if (!audioPacketQueue_.empty()) {
+        AVPacket* cached = audioPacketQueue_.front();
+        audioPacketQueue_.pop_front();
+        av_packet_move_ref(packet, cached);
+        av_packet_free(&cached);
+        return true;
+    }
+
+    // 从文件读，遇到视频包则缓存到 videoQueue_
+    while (true) {
+        int ret = av_read_frame(formatCtx_, packet);
+        if (ret < 0) return false;
+
+        if (packet->stream_index == audioStreamIndex_) {
+            return true;
         }
 
-        return true;
+        if (packet->stream_index == videoStreamIndex_) {
+            // 缓存视频包（含 BSF 转换），给视频线程用
+            if (bsfCtx_) {
+                ret = av_bsf_send_packet(bsfCtx_, packet);
+                if (ret < 0) { av_packet_unref(packet); continue; }
+                ret = av_bsf_receive_packet(bsfCtx_, packet);
+                if (ret < 0) {
+                    if (ret == AVERROR(EAGAIN)) continue;
+                    av_packet_unref(packet);
+                    continue;
+                }
+            }
+            AVPacket* cached = av_packet_alloc();
+            av_packet_move_ref(cached, packet);
+            videoPacketQueue_.push_back(cached);
+            continue;
+        }
+
+        av_packet_unref(packet);  // 跳过其他流
     }
 }
 
@@ -161,10 +248,10 @@ bool Demuxer::seek(int64_t positionUs) {
         return false;
     }
 
-    // Flush bitstream filter state after seek
-    if (bsfCtx_) {
-        av_bsf_flush(bsfCtx_);
-    }
+    if (bsfCtx_) av_bsf_flush(bsfCtx_);
+
+    // seek 后清空缓存队列，旧数据已无效
+    flushPacketQueues();
 
     return true;
 }
@@ -190,25 +277,38 @@ int64_t Demuxer::durationUs() const {
 double Demuxer::fps() const {
     if (!formatCtx_ || videoStreamIndex_ < 0) return 0.0;
     AVStream* stream = formatCtx_->streams[videoStreamIndex_];
-    if (stream->avg_frame_rate.den > 0) {
-        return av_q2d(stream->avg_frame_rate);
-    }
-    if (stream->r_frame_rate.den > 0) {
-        return av_q2d(stream->r_frame_rate);
-    }
-    return 30.0;  // fallback
+    if (stream->avg_frame_rate.den > 0) return av_q2d(stream->avg_frame_rate);
+    if (stream->r_frame_rate.den > 0) return av_q2d(stream->r_frame_rate);
+    return 30.0;
 }
 
-AVRational Demuxer::timeBase() const {
+AVRational Demuxer::videoTimeBase() const {
     if (!formatCtx_ || videoStreamIndex_ < 0) return {1, 1000000};
     return formatCtx_->streams[videoStreamIndex_]->time_base;
 }
 
-AVCodecParameters* Demuxer::codecParameters() const {
-    // Return filtered params if bsf is active (has Annex B extradata)
-    if (bsfCtx_) {
-        return bsfCtx_->par_out;
-    }
+AVCodecParameters* Demuxer::videoCodecParameters() const {
+    if (bsfCtx_) return bsfCtx_->par_out;
     if (!formatCtx_ || videoStreamIndex_ < 0) return nullptr;
     return formatCtx_->streams[videoStreamIndex_]->codecpar;
+}
+
+int Demuxer::audioSampleRate() const {
+    if (!formatCtx_ || audioStreamIndex_ < 0) return 0;
+    return formatCtx_->streams[audioStreamIndex_]->codecpar->sample_rate;
+}
+
+int Demuxer::audioChannels() const {
+    if (!formatCtx_ || audioStreamIndex_ < 0) return 0;
+    return formatCtx_->streams[audioStreamIndex_]->codecpar->ch_layout.nb_channels;
+}
+
+AVRational Demuxer::audioTimeBase() const {
+    if (!formatCtx_ || audioStreamIndex_ < 0) return {1, 1000000};
+    return formatCtx_->streams[audioStreamIndex_]->time_base;
+}
+
+AVCodecParameters* Demuxer::audioCodecParameters() const {
+    if (!formatCtx_ || audioStreamIndex_ < 0) return nullptr;
+    return formatCtx_->streams[audioStreamIndex_]->codecpar;
 }
