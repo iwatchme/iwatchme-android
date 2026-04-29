@@ -1,0 +1,14 @@
+prefix=/Users/iwatchme/android/JetpackStarter/ffmpeg/../ffmpeg_library/android/arm64-v8a
+exec_prefix=${prefix}
+libdir=/Users/iwatchme/android/JetpackStarter/ffmpeg/../ffmpeg_library/android/libs/arm64-v8a
+includedir=/Users/iwatchme/android/JetpackStarter/ffmpeg/../ffmpeg_library/android/arm64-v8a/include
+
+Name: libavfilter
+Description: FFmpeg audio/video filtering library
+Version: 9.12.100
+Requires: 
+Requires.private: libavutil >= 58.29.100
+Conflicts:
+Libs: -L${libdir}  -lavfilter 
+Libs.private: -pthread -lm -latomic
+Cflags: -I${includedir}

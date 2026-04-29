@@ -1,6 +1,7 @@
 package com.iwatchme.jetpackstarter.demo
 
 import com.iwatchme.jetpackstarter.demo.crash.CrashLibDemoScreen
+import com.iwatchme.jetpackstarter.demo.renderengine.RenderEngineDemoScreen
 import com.iwatchme.startuplab.ui.StartupInspectorScreen
 
 object DemoRegistry {
@@ -20,6 +21,14 @@ object DemoRegistry {
             description = "Initialize CrashLib manually and trigger a native crash for verification.",
             content = {
                 CrashLibDemoScreen()
+            },
+        ),
+        DemoEntry(
+            route = "demo/render-engine",
+            title = "Render Engine",
+            description = "Video playback powered by FFmpeg + MediaCodec hardware decoding with OpenGL ES render tree.",
+            content = {
+                RenderEngineDemoScreen()
             },
         ),
     )

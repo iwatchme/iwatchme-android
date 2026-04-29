@@ -1,0 +1,171 @@
+#include <jni.h>
+#include <android/native_window_jni.h>
+#include "common/log.h"
+#include "engine/RenderEngine.h"
+#include "decode/SurfaceTextureHelper.h"
+
+static JavaVM* g_jvm = nullptr;
+
+extern "C" {
+#include <libavcodec/avcodec.h>
+#include <libavformat/avformat.h>
+}
+
+// JNI 回调桥接：从 C++ 渲染线程调用 Kotlin 层的 onPlaybackCompleted
+class JniPlaybackCallback : public PlaybackCallback {
+public:
+    JniPlaybackCallback(JavaVM* jvm, jobject engineObj)
+        : jvm_(jvm), engineObj_(engineObj) {}
+
+    ~JniPlaybackCallback() override {
+        JNIEnv* env = nullptr;
+        if (jvm_->GetEnv(reinterpret_cast<void**>(&env), JNI_VERSION_1_6) == JNI_OK) {
+            env->DeleteGlobalRef(engineObj_);
+        }
+    }
+
+    void onPlaybackCompleted() override {
+        JNIEnv* env = nullptr;
+        bool attached = false;
+        int status = jvm_->GetEnv(reinterpret_cast<void**>(&env), JNI_VERSION_1_6);
+        if (status == JNI_EDETACHED) {
+            jvm_->AttachCurrentThread(&env, nullptr);
+            attached = true;
+        }
+        if (env) {
+            jclass clazz = env->GetObjectClass(engineObj_);
+            jmethodID method = env->GetMethodID(clazz, "onNativePlaybackCompleted", "()V");
+            if (method) {
+                env->CallVoidMethod(engineObj_, method);
+            }
+            env->DeleteLocalRef(clazz);
+        }
+        if (attached) {
+            jvm_->DetachCurrentThread();
+        }
+    }
+
+private:
+    JavaVM* jvm_;
+    jobject engineObj_;  // 全局引用
+};
+
+// 将 engine 和 callback 打包在一起，方便通过 handle 统一管理生命周期
+struct EngineEntry {
+    RenderEngine* engine;
+    JniPlaybackCallback* callback;
+};
+
+JNIEXPORT jint JNI_OnLoad(JavaVM* vm, void* /* reserved */) {
+    g_jvm = vm;
+    JNIEnv* env = nullptr;
+    if (vm->GetEnv(reinterpret_cast<void**>(&env), JNI_VERSION_1_6) != JNI_OK) {
+        LOGE("JNI_OnLoad: GetEnv failed");
+        return JNI_ERR;
+    }
+
+    // 在主线程中缓存应用类引用（渲染线程的 ClassLoader 无法找到应用类）
+    SurfaceTextureHelper::cacheJavaClasses(env);
+
+    LOGI("RenderEngine native library loaded");
+    return JNI_VERSION_1_6;
+}
+
+extern "C" JNIEXPORT jstring JNICALL
+Java_com_iwatchme_renderengine_RenderEngine_nativeVersion(JNIEnv* env, jobject /* this */) {
+    const char* ffmpegVersion = av_version_info();
+    char version[256];
+    snprintf(version, sizeof(version), "RenderEngine v0.1.0 | FFmpeg %s", ffmpegVersion);
+    LOGI("%s", version);
+    return env->NewStringUTF(version);
+}
+
+extern "C" JNIEXPORT jlong JNICALL
+Java_com_iwatchme_renderengine_RenderEngine_nativeCreate(JNIEnv* env, jobject thiz) {
+    auto* engine = new RenderEngine(g_jvm);
+
+    // 设置播放完成回调
+    jobject globalRef = env->NewGlobalRef(thiz);
+    auto* callback = new JniPlaybackCallback(g_jvm, globalRef);
+    engine->setCallback(callback);
+
+    // 打包 engine + callback，统一通过 handle 管理
+    auto* entry = new EngineEntry{engine, callback};
+    return reinterpret_cast<jlong>(entry);
+}
+
+extern "C" JNIEXPORT void JNICALL
+Java_com_iwatchme_renderengine_RenderEngine_nativeDestroy(JNIEnv* /* env */, jobject /* this */, jlong handle) {
+    auto* entry = reinterpret_cast<EngineEntry*>(handle);
+    entry->engine->setCallback(nullptr);
+    delete entry->engine;
+    delete entry->callback;
+    delete entry;
+}
+
+static RenderEngine* getEngine(jlong handle) {
+    auto* entry = reinterpret_cast<EngineEntry*>(handle);
+    return entry->engine;
+}
+
+extern "C" JNIEXPORT void JNICALL
+Java_com_iwatchme_renderengine_RenderEngine_nativeSetSurface(JNIEnv* env, jobject /* this */, jlong handle, jobject surface) {
+    auto* engine = getEngine(handle);
+    ANativeWindow* window = nullptr;
+    if (surface != nullptr) {
+        window = ANativeWindow_fromSurface(env, surface);
+    }
+    engine->setSurface(window);
+    if (window) {
+        ANativeWindow_release(window);  // setSurface 内部会自己 acquire 引用
+    }
+}
+
+extern "C" JNIEXPORT jboolean JNICALL
+Java_com_iwatchme_renderengine_RenderEngine_nativeSetVideoSource(JNIEnv* env, jobject /* this */, jlong handle, jstring filePath) {
+    auto* engine = getEngine(handle);
+    const char* path = env->GetStringUTFChars(filePath, nullptr);
+    bool result = engine->setVideoSource(path);
+    env->ReleaseStringUTFChars(filePath, path);
+    return result ? JNI_TRUE : JNI_FALSE;
+}
+
+extern "C" JNIEXPORT jlong JNICALL
+Java_com_iwatchme_renderengine_RenderEngine_nativeGetDuration(JNIEnv* /* env */, jobject /* this */, jlong handle) {
+    return getEngine(handle)->getDuration();
+}
+
+extern "C" JNIEXPORT jint JNICALL
+Java_com_iwatchme_renderengine_RenderEngine_nativeGetVideoWidth(JNIEnv* /* env */, jobject /* this */, jlong handle) {
+    return getEngine(handle)->getVideoWidth();
+}
+
+extern "C" JNIEXPORT jint JNICALL
+Java_com_iwatchme_renderengine_RenderEngine_nativeGetVideoHeight(JNIEnv* /* env */, jobject /* this */, jlong handle) {
+    return getEngine(handle)->getVideoHeight();
+}
+
+extern "C" JNIEXPORT void JNICALL
+Java_com_iwatchme_renderengine_RenderEngine_nativePlay(JNIEnv* /* env */, jobject /* this */, jlong handle) {
+    getEngine(handle)->play();
+}
+
+extern "C" JNIEXPORT void JNICALL
+Java_com_iwatchme_renderengine_RenderEngine_nativePause(JNIEnv* /* env */, jobject /* this */, jlong handle) {
+    getEngine(handle)->pause();
+}
+
+extern "C" JNIEXPORT void JNICALL
+Java_com_iwatchme_renderengine_RenderEngine_nativeSeek(JNIEnv* /* env */, jobject /* this */, jlong handle, jlong positionUs) {
+    getEngine(handle)->seek(positionUs);
+}
+
+extern "C" JNIEXPORT void JNICALL
+Java_com_iwatchme_renderengine_RenderEngine_nativeSeekFast(JNIEnv* /* env */, jobject /* this */, jlong handle, jlong positionUs) {
+    getEngine(handle)->seekFast(positionUs);
+}
+
+extern "C" JNIEXPORT jlong JNICALL
+Java_com_iwatchme_renderengine_RenderEngine_nativeGetPosition(JNIEnv* /* env */, jobject /* this */, jlong handle) {
+    return getEngine(handle)->getPosition();
+}

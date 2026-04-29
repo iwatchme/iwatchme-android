@@ -2,6 +2,9 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools">
 
+    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
+    <uses-permission android:name="android.permission.READ_MEDIA_VIDEO" />
+
     <application
         android:name=".JetpackApplication"
         android:allowBackup="true"
@@ -26,6 +29,12 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <activity
+            android:name=".demo.renderengine.RenderEngineDemoActivity"
+            android:exported="true"
+            android:label="RenderEngine Demo"
+            android:theme="@style/Theme.JetpackStarter" />
     </application>
 
 </manifest>

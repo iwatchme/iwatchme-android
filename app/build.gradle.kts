@@ -12,6 +12,10 @@ android {
         applicationId = "com.iwatchme.jetpackstarter"
         versionCode = 1
         versionName = "1.0"
+
+        ndk {
+            abiFilters.add("arm64-v8a")
+        }
     }
 
     buildTypes {
@@ -55,6 +59,7 @@ dependencies {
 
     implementation(project(":crashLib"))
     implementation(project(":startupLab"))
+    implementation(project(":render-engine"))
     baselineProfile(project(":baselineprofile"))
 
     testImplementation(libs.junit)
