@@ -4,6 +4,12 @@ import android.os.Handler
 import android.os.Looper
 import android.view.Surface
 
+data class VideoClip(
+    val sourcePath: String,
+    val trimInUs: Long = 0,
+    val trimOutUs: Long = -1  // -1 = 使用完整时长
+)
+
 class RenderEngine {
 
     companion object {
@@ -39,6 +45,17 @@ class RenderEngine {
     fun setVideoSource(filePath: String): Boolean {
         if (nativeHandle == 0L) return false
         return nativeSetVideoSource(nativeHandle, filePath)
+    }
+
+    /**
+     * 设置多片段时间线，替代 setVideoSource 用于多片段拼接播放。
+     */
+    fun setTimeline(clips: List<VideoClip>): Boolean {
+        if (nativeHandle == 0L || clips.isEmpty()) return false
+        val paths = clips.map { it.sourcePath }.toTypedArray()
+        val trimIns = clips.map { it.trimInUs }.toLongArray()
+        val trimOuts = clips.map { it.trimOutUs }.toLongArray()
+        return nativeSetTimeline(nativeHandle, paths, trimIns, trimOuts)
     }
 
     fun play() {
@@ -95,6 +112,7 @@ class RenderEngine {
     private external fun nativeDestroy(handle: Long)
     private external fun nativeSetSurface(handle: Long, surface: Surface?)
     private external fun nativeSetVideoSource(handle: Long, filePath: String): Boolean
+    private external fun nativeSetTimeline(handle: Long, paths: Array<String>, trimIns: LongArray, trimOuts: LongArray): Boolean
     private external fun nativePlay(handle: Long)
     private external fun nativePause(handle: Long)
     private external fun nativeSeek(handle: Long, positionUs: Long)

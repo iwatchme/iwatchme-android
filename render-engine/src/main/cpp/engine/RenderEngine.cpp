@@ -38,14 +38,14 @@ void RenderEngine::setSurface(ANativeWindow* window) {
 }
 
 bool RenderEngine::setVideoSource(const std::string& filePath) {
-    uint32_t generation = beginTimelineTransition();
-    std::lock_guard<std::mutex> lock(videoSourceMutex_);
-    videoPath_ = filePath;
-    videoSourceChanged_.store(true);
-    cmdCond_.notify_one();
-    LOGI("RenderEngine: video source queued: %s", filePath.c_str());
-    LOGI("AVSYNC transition source generation=%u path=%s", generation, filePath.c_str());
-    return true;
+    // 向后兼容：创建单片段 timeline
+    Clip c;
+    c.sourcePath = filePath;
+    c.trimIn = 0;
+    c.trimOut = -1;  // setTimeline 中 probe 文件获取真实时长
+    std::vector<Clip> clips;
+    clips.push_back(std::move(c));
+    return setTimeline(std::move(clips));
 }
 
 void RenderEngine::play() {
@@ -81,7 +81,10 @@ void RenderEngine::seekFast(int64_t positionUs) {
          generation, (long long)positionUs);
 }
 
-int64_t RenderEngine::getDuration() const { return demuxer_.durationUs(); }
+int64_t RenderEngine::getDuration() const {
+    if (!timeline_.isEmpty()) return timeline_.durationUs();
+    return demuxer_.durationUs();
+}
 int64_t RenderEngine::getPosition() const { return currentPositionUs_.load(); }
 int RenderEngine::getVideoWidth() const { return demuxer_.videoWidth(); }
 int RenderEngine::getVideoHeight() const { return demuxer_.videoHeight(); }
@@ -105,6 +108,130 @@ void RenderEngine::endTimelineTransition(uint32_t generation) {
     }
 }
 
+bool RenderEngine::switchToClip(int clipIndex, int64_t sourcePositionUs, JNIEnv* env) {
+    if (clipIndex < 0 || clipIndex >= timeline_.clipCount()) return false;
+    const Clip& clip = timeline_.clipAt(clipIndex);
+    LOGI("RenderEngine: switchToClip %d → %d, sourcePos=%lld, path=%s",
+         activeClipIndex_, clipIndex, (long long)sourcePositionUs, clip.sourcePath.c_str());
+
+    // 1. 停止音频线程（显式 join，确保退出 decode/write 临界区）
+    audioRunning_.store(false);
+    if (audioThread_.joinable()) audioThread_.join();
+
+    // 2. close 旧 Demuxer，open 新文件
+    demuxer_.close();
+    if (!demuxer_.open(clip.sourcePath.c_str())) {
+        LOGE("switchToClip: failed to open %s", clip.sourcePath.c_str());
+        return false;
+    }
+
+    // 3. 比较完整解码配置，决定 flush 还是重建
+    DecoderConfig newConfig = DecoderConfig::fromCodecParameters(demuxer_.videoCodecParameters());
+
+    if (newConfig == activeDecoderConfig_) {
+        hwDecoder_.flush();
+        LOGI("switchToClip: same decoder config, flush only");
+    } else {
+        hwDecoder_.release();
+        if (!hwDecoder_.init(demuxer_.videoCodecParameters(), stHelper_.nativeWindow())) {
+            LOGE("switchToClip: HwDecoder re-init failed");
+            return false;
+        }
+        activeDecoderConfig_ = newConfig;
+        LOGI("switchToClip: decoder config changed, re-init codec");
+    }
+
+    // 4. 分辨率变化时重建 SourceNode GL 资源
+    int newW = demuxer_.videoWidth();
+    int newH = demuxer_.videoHeight();
+    if (newW != sourceNode_->outputWidth || newH != sourceNode_->outputHeight) {
+        sourceNode_->releaseGL();
+        sourceNode_->initGL(newW, newH);
+        LOGI("switchToClip: SourceNode GL re-init %dx%d", newW, newH);
+    }
+
+    // 5. 重置 SurfaceTexture frameAvailable 标记，不主动 updateTexImage
+    stHelper_.consumeFrameAvailable();
+
+    // 6. Seek 到源文件位置
+    if (sourcePositionUs > 0) {
+        demuxer_.seek(sourcePositionUs);
+    }
+
+    // 7. 重建音频管线（音频线程已 join，安全操作）
+    hasAudio_ = false;
+    audioDecoder_.release();
+
+    // 统一 flush：无论新片段是否有音频，都先清掉旧 PCM 残留
+    if (audioOutput_.isOpen()) {
+        audioOutput_.flush();
+    }
+
+    if (demuxer_.hasAudio()) {
+        // AudioOutput 按需打开：首片段无音频、后续片段有音频的场景
+        if (!audioOutput_.isOpen()) {
+            int sr = demuxer_.audioSampleRate() > 0 ? demuxer_.audioSampleRate() : 48000;
+            if (!audioOutput_.open(sr, 2)) {
+                LOGW("switchToClip: AudioOutput open failed, skip audio");
+                goto skip_audio;
+            }
+        }
+        if (audioDecoder_.init(
+                demuxer_.audioCodecParameters(),
+                demuxer_.audioTimeBase(),
+                audioOutput_.sampleRate(),
+                audioOutput_.channels())) {
+            hasAudio_ = true;
+        } else {
+            LOGW("switchToClip: AudioDecoder init failed, skip audio");
+        }
+    }
+    skip_audio:
+
+    // 8. 重启音频线程
+    if (hasAudio_) {
+        audioRunning_.store(true);
+        audioThread_ = std::thread(&RenderEngine::audioThreadFunc, this);
+    }
+
+    // 9. 更新状态
+    activeClipIndex_ = clipIndex;
+    skipUntilPtsUs_ = sourcePositionUs;
+
+    LOGI("AVSYNC clip-switch clipIndex=%d sourcePos=%lld audio=%d",
+         clipIndex, (long long)sourcePositionUs, hasAudio_ ? 1 : 0);
+    return true;
+}
+
+bool RenderEngine::setTimeline(std::vector<Clip> clips) {
+    uint32_t generation = beginTimelineTransition();
+
+    // 对 trimOut == -1 的片段，probe 文件获取真实时长
+    for (auto& clip : clips) {
+        if (clip.trimOut < 0) {
+            Demuxer probe;
+            if (probe.open(clip.sourcePath.c_str())) {
+                clip.trimOut = probe.durationUs();
+                probe.close();
+            } else {
+                LOGE("RenderEngine: setTimeline: failed to probe %s", clip.sourcePath.c_str());
+                return false;
+            }
+        }
+    }
+
+    {
+        std::lock_guard<std::mutex> lock(videoSourceMutex_);
+        timeline_.setClips(std::move(clips));
+        videoSourceChanged_.store(true);
+    }
+
+    cmdCond_.notify_one();
+    LOGI("RenderEngine: timeline set %d clips, duration=%.2fs, generation=%u",
+         timeline_.clipCount(), timeline_.durationUs() / 1000000.0, generation);
+    return true;
+}
+
 void RenderEngine::startRenderThread() {
     running_.store(true);
     renderThread_ = std::thread(&RenderEngine::renderThreadFunc, this);
@@ -122,14 +249,15 @@ void RenderEngine::stopRenderThread() {
 bool RenderEngine::initDecodePipeline(JNIEnv* env) {
     releaseDecodePipeline(env);
 
-    std::string path;
-    {
-        std::lock_guard<std::mutex> lock(videoSourceMutex_);
-        path = videoPath_;
+    // 从 timeline 第一个片段初始化
+    if (timeline_.isEmpty()) {
+        LOGE("RenderEngine: initDecodePipeline: timeline is empty");
+        return false;
     }
 
-    if (!demuxer_.open(path.c_str())) {
-        LOGE("RenderEngine: failed to open video: %s", path.c_str());
+    const Clip& firstClip = timeline_.clipAt(0);
+    if (!demuxer_.open(firstClip.sourcePath.c_str())) {
+        LOGE("RenderEngine: failed to open video: %s", firstClip.sourcePath.c_str());
         return false;
     }
 
@@ -143,6 +271,11 @@ bool RenderEngine::initDecodePipeline(JNIEnv* env) {
         stHelper_.release(env);
         return false;
     }
+
+    // 记录解码配置指纹
+    activeDecoderConfig_ = DecoderConfig::fromCodecParameters(demuxer_.videoCodecParameters());
+    activeClipIndex_ = 0;
+    skipUntilPtsUs_ = firstClip.trimIn;
 
     int w = demuxer_.videoWidth();
     int h = demuxer_.videoHeight();
@@ -159,6 +292,11 @@ bool RenderEngine::initDecodePipeline(JNIEnv* env) {
         return false;
     }
     outputNode_->inputs.push_back(sourceNode_);
+
+    // 如果 trimIn > 0，seek 到起始位置
+    if (firstClip.trimIn > 0) {
+        demuxer_.seek(firstClip.trimIn);
+    }
 
     // 初始化音频管线（如果有音频流）
     hasAudio_ = false;
@@ -189,7 +327,8 @@ bool RenderEngine::initDecodePipeline(JNIEnv* env) {
 
     currentPositionUs_.store(0);
     pipelineInitialized_ = true;
-    LOGI("RenderEngine: pipeline initialized %dx%d, audio=%s", w, h, hasAudio_ ? "yes" : "no");
+    LOGI("RenderEngine: pipeline initialized %dx%d, audio=%s, clip=%d/%d",
+         w, h, hasAudio_ ? "yes" : "no", activeClipIndex_, timeline_.clipCount());
     return true;
 }
 
@@ -210,6 +349,10 @@ void RenderEngine::releaseDecodePipeline(JNIEnv* env) {
     hwDecoder_.release();
     stHelper_.release(env);
     demuxer_.close();
+
+    activeClipIndex_ = -1;
+    activeDecoderConfig_ = DecoderConfig{};
+    skipUntilPtsUs_ = 0;
 
     pipelineInitialized_ = false;
     LOGI("RenderEngine: pipeline released");
@@ -398,9 +541,23 @@ void RenderEngine::renderThreadFunc() {
                 av_packet_unref(pkt);
                 hasPendingPkt = false;
             }
+
+            // 解析全局位置 → 片段 + 源位置
+            int64_t sourceSeekPos = fastTarget;
+            if (!timeline_.isEmpty()) {
+                ClipLookup lookup = timeline_.resolve(fastTarget);
+                if (lookup.clipIndex < 0) lookup = timeline_.resolve(timeline_.durationUs() - 1);
+                if (lookup.clipIndex != activeClipIndex_) {
+                    switchToClip(lookup.clipIndex, lookup.sourcePositionUs, env);
+                } else {
+                    skipUntilPtsUs_ = lookup.sourcePositionUs;
+                }
+                sourceSeekPos = lookup.sourcePositionUs;
+            }
+
             {
                 std::lock_guard<std::mutex> lock(demuxer_.readMutex());
-                demuxer_.seek(fastTarget);
+                demuxer_.seek(sourceSeekPos);
             }
             hwDecoder_.flush();
             frameTimerValid = false;
@@ -421,14 +578,23 @@ void RenderEngine::renderThreadFunc() {
                     hasPendingPkt = false;
                 }
 
-                int64_t pts = hwDecoder_.dequeueAndRender(5000);
-                if (pts >= 0) {
+                HwDecoder::DecodedFrame frame;
+                if (hwDecoder_.dequeueOutput(frame, 5000)) {
+                    int64_t framePtsUs = av_rescale_q(frame.pts, tb, {1, 1000000});
+
+                    // 快速 seek 取第一帧即可，直接渲染
+                    hwDecoder_.releaseOutput(frame.bufferIndex, true);
                     stHelper_.waitForFrame(50);
                     stHelper_.consumeFrameAvailable();
                     stHelper_.updateTexImage(env);
 
-                    int64_t framePtsUs = av_rescale_q(pts, tb, {1, 1000000});
-                    currentPositionUs_.store(framePtsUs);
+                    // 转换为全局位置
+                    if (!timeline_.isEmpty() && activeClipIndex_ >= 0) {
+                        const Clip& clip = timeline_.clipAt(activeClipIndex_);
+                        currentPositionUs_.store(clip.inPoint + (framePtsUs - clip.trimIn));
+                    } else {
+                        currentPositionUs_.store(framePtsUs);
+                    }
 
                     outputNode_->outputWidth = surfaceWidth;
                     outputNode_->outputHeight = surfaceHeight;
@@ -451,9 +617,23 @@ void RenderEngine::renderThreadFunc() {
                 av_packet_unref(pkt);
                 hasPendingPkt = false;
             }
+
+            // 解析全局位置 → 片段 + 源位置
+            int64_t sourceSeekTarget = seekTarget;
+            if (!timeline_.isEmpty()) {
+                ClipLookup lookup = timeline_.resolve(seekTarget);
+                if (lookup.clipIndex < 0) lookup = timeline_.resolve(timeline_.durationUs() - 1);
+                if (lookup.clipIndex != activeClipIndex_) {
+                    switchToClip(lookup.clipIndex, lookup.sourcePositionUs, env);
+                } else {
+                    skipUntilPtsUs_ = lookup.sourcePositionUs;
+                }
+                sourceSeekTarget = lookup.sourcePositionUs;
+            }
+
             {
                 std::lock_guard<std::mutex> lock(demuxer_.readMutex());
-                demuxer_.seek(seekTarget);
+                demuxer_.seek(sourceSeekTarget);
             }
             hwDecoder_.flush();
             frameTimerValid = false;
@@ -484,19 +664,27 @@ void RenderEngine::renderThreadFunc() {
                     }
                 }
 
-                int64_t pts = hwDecoder_.dequeueAndRender(30000);
-                if (pts < 0) {
+                HwDecoder::DecodedFrame frame;
+                if (!hwDecoder_.dequeueOutput(frame, 30000)) {
                     if (eof) break;
                     continue;
                 }
 
-                int64_t framePtsUs = av_rescale_q(pts, tb, {1, 1000000});
+                int64_t framePtsUs = av_rescale_q(frame.pts, tb, {1, 1000000});
 
-                if (framePtsUs >= seekTarget) {
+                if (framePtsUs >= sourceSeekTarget) {
+                    // 目标帧：渲染
+                    hwDecoder_.releaseOutput(frame.bufferIndex, true);
                     stHelper_.waitForFrame(50);
                     stHelper_.consumeFrameAvailable();
                     stHelper_.updateTexImage(env);
-                    currentPositionUs_.store(framePtsUs);
+
+                    if (!timeline_.isEmpty() && activeClipIndex_ >= 0) {
+                        const Clip& clip = timeline_.clipAt(activeClipIndex_);
+                        currentPositionUs_.store(clip.inPoint + (framePtsUs - clip.trimIn));
+                    } else {
+                        currentPositionUs_.store(framePtsUs);
+                    }
 
                     outputNode_->outputWidth = surfaceWidth;
                     outputNode_->outputHeight = surfaceHeight;
@@ -505,6 +693,8 @@ void RenderEngine::renderThreadFunc() {
 
                     reachedTarget = true;
                 } else {
+                    // seek 路径的跳过帧：render=true 驱动 SurfaceTexture 更新
+                    hwDecoder_.releaseOutput(frame.bufferIndex, true);
                     stHelper_.waitForFrame(50);
                     stHelper_.consumeFrameAvailable();
                     stHelper_.updateTexImage(env);
@@ -512,10 +702,11 @@ void RenderEngine::renderThreadFunc() {
                 }
             }
             currentPositionUs_.store(seekTarget);
-            LOGI("AVSYNC transition seek-ready generation=%u requestedUs=%lld displayedUs=%lld audioClockUs=%lld",
+            LOGI("AVSYNC transition seek-ready generation=%u requestedUs=%lld sourceTargetUs=%lld skipCount=%d audioClockUs=%lld",
                  transitionGeneration,
                  (long long)seekTarget,
-                 (long long)currentPositionUs_.load(),
+                 (long long)sourceSeekTarget,
+                 skipCount,
                  (long long)getAudioClockUs());
             endTimelineTransition(transitionGeneration);
         }
@@ -531,21 +722,46 @@ void RenderEngine::renderThreadFunc() {
         }
 
         if (eof) {
+            // Demuxer EOF：可能是片段结束，也可能是真正的时间线结束。
+            // 先检查是否还有后续片段。
+            int next = activeClipIndex_ + 1;
+            if (!timeline_.isEmpty() && next < timeline_.clipCount()) {
+                // 片段边界：切到下一个片段
+                uint32_t gen = beginTimelineTransition();
+                if (hasPendingPkt) { av_packet_unref(pkt); hasPendingPkt = false; }
+                switchToClip(next, timeline_.clipAt(next).trimIn, env);
+                frameTimerValid = false;
+                lastFramePtsUs = -1;
+                consecutiveDrops = 0;
+                eof = false;
+                endTimelineTransition(gen);
+                LOGI("RenderEngine: clip EOF → switch to clip %d", next);
+                continue;
+            }
+
+            // 真正的时间线 EOF，再次 Play → 从头开始
             uint32_t transitionGeneration = beginTimelineTransition();
-            audioSeekTargetUs_.store(0);
-            // EOF 状态下再次 Play → 自动从头开始
             if (hasPendingPkt) {
                 av_packet_unref(pkt);
                 hasPendingPkt = false;
             }
-            {
-                std::lock_guard<std::mutex> lock(demuxer_.readMutex());
-                demuxer_.seek(0);
-            }
-            hwDecoder_.flush();
-            if (hasAudio_) {
-                audioDecoder_.flush();
-                audioOutput_.flush();
+            if (!timeline_.isEmpty() && timeline_.clipCount() > 1) {
+                // 多片段：切回第一个片段
+                switchToClip(0, timeline_.clipAt(0).trimIn, env);
+            } else {
+                // 单片段 / 兼容路径：seek 到起点
+                int64_t startPos = timeline_.isEmpty() ? 0 : timeline_.clipAt(0).trimIn;
+                audioSeekTargetUs_.store(startPos);
+                {
+                    std::lock_guard<std::mutex> lock(demuxer_.readMutex());
+                    demuxer_.seek(startPos);
+                }
+                hwDecoder_.flush();
+                if (hasAudio_) {
+                    audioDecoder_.flush();
+                    audioOutput_.flush();
+                }
+                skipUntilPtsUs_ = startPos;
             }
             currentPositionUs_.store(0);
             frameTimerValid = false;
@@ -589,13 +805,45 @@ void RenderEngine::renderThreadFunc() {
         }
         int64_t feedEndUs = steadyNowUs();
 
-        // 第 2 步：取出一帧解码后的数据
+        // 第 2 步：取出解码帧（不渲染），先判 PTS 再决定是否送 SurfaceTexture
         int64_t dequeueStartUs = feedEndUs;
-        int64_t pts = hwDecoder_.dequeueAndRender(30000);
+        HwDecoder::DecodedFrame decodedFrame;
+        bool gotFrame = hwDecoder_.dequeueOutput(decodedFrame, 30000);
         int64_t dequeueEndUs = steadyNowUs();
-        if (pts < 0) continue;
+        if (!gotFrame) continue;
 
-        // 第 3 步：等待帧到达 SurfaceTexture
+        int64_t framePtsUs = av_rescale_q(decodedFrame.pts, tb, {1, 1000000});
+
+        // 第 2.5 步：trimIn/trimOut 边界判断（先判后渲染）
+        if (framePtsUs < skipUntilPtsUs_) {
+            // trimIn 之前的帧：丢弃（keyframe seek 可能解出更早的帧）
+            hwDecoder_.releaseOutput(decodedFrame.bufferIndex, false);
+            continue;
+        }
+        if (!timeline_.isEmpty() && activeClipIndex_ >= 0
+            && framePtsUs >= timeline_.clipAt(activeClipIndex_).trimOut) {
+            // 超过片段边界：丢弃，触发片段切换（Phase D 实现）
+            hwDecoder_.releaseOutput(decodedFrame.bufferIndex, false);
+            int next = activeClipIndex_ + 1;
+            if (next < timeline_.clipCount()) {
+                uint32_t gen = beginTimelineTransition();
+                if (hasPendingPkt) { av_packet_unref(pkt); hasPendingPkt = false; }
+                switchToClip(next, timeline_.clipAt(next).trimIn, env);
+                frameTimerValid = false;
+                lastFramePtsUs = -1;
+                consecutiveDrops = 0;
+                eof = false;
+                endTimelineTransition(gen);
+                continue;
+            } else {
+                eof = true;
+                continue;
+            }
+        }
+
+        // 第 3 步：帧在有效范围内，送入 SurfaceTexture
+        hwDecoder_.releaseOutput(decodedFrame.bufferIndex, true);
+
         int64_t waitStartUs = dequeueEndUs;
         stHelper_.waitForFrame(50);
         int64_t waitEndUs = steadyNowUs();
@@ -604,8 +852,13 @@ void RenderEngine::renderThreadFunc() {
         stHelper_.updateTexImage(env);
         int64_t updateEndUs = steadyNowUs();
 
-        int64_t framePtsUs = av_rescale_q(pts, tb, {1, 1000000});
-        currentPositionUs_.store(framePtsUs);
+        // 更新全局位置
+        if (!timeline_.isEmpty() && activeClipIndex_ >= 0) {
+            const Clip& clip = timeline_.clipAt(activeClipIndex_);
+            currentPositionUs_.store(clip.inPoint + (framePtsUs - clip.trimIn));
+        } else {
+            currentPositionUs_.store(framePtsUs);
+        }
 
         // =============================================
         // 第 4 步：A/V 同步 — FFplay frame_timer + compute_target_delay
@@ -750,13 +1003,20 @@ void RenderEngine::renderThreadFunc() {
                  shouldRender ? 1 : 0);
         }
 
-        // EOF 后通知
+        // EOF 后：如果还有后续片段，不暂停，让下一轮循环走片段切换逻辑
         if (eof) {
-            playing_.store(false);
-            if (hasAudio_) audioOutput_.pause();
-            LOGI("RenderEngine: playback completed (EOF)");
-            if (callback_) {
-                callback_->onPlaybackCompleted();
+            int next = activeClipIndex_ + 1;
+            if (timeline_.isEmpty() || next >= timeline_.clipCount()) {
+                // 真正的时间线 EOF：暂停并通知上层
+                playing_.store(false);
+                if (hasAudio_) audioOutput_.pause();
+                LOGI("RenderEngine: playback completed (EOF)");
+                if (callback_) {
+                    callback_->onPlaybackCompleted();
+                }
+            } else {
+                // 片段 EOF 但还有下一个：不暂停，直接进入下一轮切换
+                LOGI("RenderEngine: clip %d EOF, next clip %d pending", activeClipIndex_, next);
             }
         }
     }

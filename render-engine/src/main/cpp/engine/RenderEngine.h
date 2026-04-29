@@ -15,6 +15,7 @@
 #include "audio/AudioOutput.h"
 #include "core/SourceNode.h"
 #include "core/OutputNode.h"
+#include "engine/Timeline.h"
 
 // 播放事件回调接口
 class PlaybackCallback {
@@ -30,6 +31,7 @@ public:
 
     void setSurface(ANativeWindow* window);
     bool setVideoSource(const std::string& filePath);
+    bool setTimeline(std::vector<Clip> clips);
 
     void play();
     void pause();
@@ -50,6 +52,7 @@ private:
     void stopRenderThread();
     uint32_t beginTimelineTransition();
     void endTimelineTransition(uint32_t generation);
+    bool switchToClip(int clipIndex, int64_t sourcePositionUs, JNIEnv* env);
 
     bool initDecodePipeline(JNIEnv* env);
     void releaseDecodePipeline(JNIEnv* env);
@@ -66,6 +69,12 @@ private:
     std::string videoPath_;
     std::mutex videoSourceMutex_;
     std::atomic<bool> videoSourceChanged_{false};
+
+    // 多片段时间线
+    Timeline timeline_;
+    int activeClipIndex_ = -1;
+    DecoderConfig activeDecoderConfig_;
+    int64_t skipUntilPtsUs_ = 0;
 
     // 视频解码
     HwDecoder hwDecoder_;

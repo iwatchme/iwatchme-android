@@ -31,6 +31,7 @@ set(SOURCES
     src/main/cpp/core/OutputNode.cpp
     src/main/cpp/audio/AudioOutput.cpp
     src/main/cpp/engine/RenderEngine.cpp
+    src/main/cpp/engine/Timeline.cpp
 )
 
 add_library(render-engine SHARED ${SOURCES})

@@ -2,6 +2,7 @@
 #include <android/native_window_jni.h>
 #include "common/log.h"
 #include "engine/RenderEngine.h"
+#include "engine/Timeline.h"
 #include "decode/SurfaceTextureHelper.h"
 
 static JavaVM* g_jvm = nullptr;
@@ -163,6 +164,39 @@ Java_com_iwatchme_renderengine_RenderEngine_nativeSeek(JNIEnv* /* env */, jobjec
 extern "C" JNIEXPORT void JNICALL
 Java_com_iwatchme_renderengine_RenderEngine_nativeSeekFast(JNIEnv* /* env */, jobject /* this */, jlong handle, jlong positionUs) {
     getEngine(handle)->seekFast(positionUs);
+}
+
+extern "C" JNIEXPORT jboolean JNICALL
+Java_com_iwatchme_renderengine_RenderEngine_nativeSetTimeline(
+    JNIEnv* env, jobject /* this */, jlong handle,
+    jobjectArray paths, jlongArray trimIns, jlongArray trimOuts)
+{
+    auto* engine = getEngine(handle);
+
+    int count = env->GetArrayLength(paths);
+    jlong* trimInArr = env->GetLongArrayElements(trimIns, nullptr);
+    jlong* trimOutArr = env->GetLongArrayElements(trimOuts, nullptr);
+
+    std::vector<Clip> clips;
+    clips.reserve(count);
+    for (int i = 0; i < count; i++) {
+        auto jpath = (jstring)env->GetObjectArrayElement(paths, i);
+        const char* path = env->GetStringUTFChars(jpath, nullptr);
+
+        Clip clip;
+        clip.sourcePath = path;
+        clip.trimIn = trimInArr[i];
+        clip.trimOut = trimOutArr[i];
+        clips.push_back(std::move(clip));
+
+        env->ReleaseStringUTFChars(jpath, path);
+        env->DeleteLocalRef(jpath);
+    }
+
+    env->ReleaseLongArrayElements(trimIns, trimInArr, 0);
+    env->ReleaseLongArrayElements(trimOuts, trimOutArr, 0);
+
+    return engine->setTimeline(std::move(clips)) ? JNI_TRUE : JNI_FALSE;
 }
 
 extern "C" JNIEXPORT jlong JNICALL

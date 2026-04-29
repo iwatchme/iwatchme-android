@@ -9,19 +9,25 @@ import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.Button
+import androidx.compose.material.ButtonDefaults
 import androidx.compose.material.MaterialTheme
 import androidx.compose.material.Slider
 import androidx.compose.material.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import com.iwatchme.renderengine.RenderEngineView
+import com.iwatchme.renderengine.VideoClip
 import kotlinx.coroutines.delay
 import java.io.File
 
@@ -42,29 +48,30 @@ fun RenderEngineDemoScreen() {
     var isPlaying by remember { mutableStateOf(false) }
     var currentPositionMs by remember { mutableStateOf(0L) }
     var durationMs by remember { mutableStateOf(0L) }
-    var videoLoaded by remember { mutableStateOf(false) }
+    var timelineStarted by remember { mutableStateOf(false) }
     var versionText by remember { mutableStateOf("") }
     var statusText by remember { mutableStateOf("") }
     val context = LocalContext.current
 
-    // File picker: copy selected video to cache dir, then load
+    // 已添加的片段列表（文件路径）
+    val clips = remember { mutableStateListOf<String>() }
+
+    // File picker: copy selected video to cache dir, add to clip list
     val filePickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetContent()
     ) { uri: Uri? ->
         if (uri == null) return@rememberLauncherForActivityResult
         statusText = "Copying video..."
         try {
-            val cacheFile = File(context.cacheDir, "input_video.mp4")
+            val index = clips.size
+            val cacheFile = File(context.cacheDir, "clip_$index.mp4")
             context.contentResolver.openInputStream(uri)?.use { input ->
                 cacheFile.outputStream().use { output ->
                     input.copyTo(output)
                 }
             }
-            engineView?.engine?.let { engine ->
-                engine.setVideoSource(cacheFile.absolutePath)
-                videoLoaded = true
-                statusText = ""
-            }
+            clips.add(cacheFile.absolutePath)
+            statusText = ""
         } catch (e: Exception) {
             statusText = "Error: ${e.message}"
             Toast.makeText(context, "Failed to load video: ${e.message}", Toast.LENGTH_LONG).show()
@@ -78,9 +85,9 @@ fun RenderEngineDemoScreen() {
         }
     }
 
-    // Poll position and duration while video is loaded
-    LaunchedEffect(videoLoaded, isPlaying) {
-        while (videoLoaded) {
+    // Poll position and duration while timeline is active
+    LaunchedEffect(timelineStarted, isPlaying) {
+        while (timelineStarted) {
             engineView?.engine?.let {
                 val dur = it.getDuration() / 1000
                 if (dur > 0) durationMs = dur
@@ -120,7 +127,7 @@ fun RenderEngineDemoScreen() {
                 modifier = Modifier.fillMaxSize()
             )
 
-            if (!videoLoaded) {
+            if (!timelineStarted) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     Text(
                         text = versionText.ifEmpty { "RenderEngine" },
@@ -142,16 +149,73 @@ fun RenderEngineDemoScreen() {
                 .background(Color(0xFF1A1A1A))
                 .padding(16.dp)
         ) {
-            if (!videoLoaded) {
-                Button(
-                    onClick = { filePickerLauncher.launch("video/*") },
+            // Clip list
+            if (clips.isNotEmpty()) {
+                Text("Clips (${clips.size}):", color = Color.Gray, fontSize = 12.sp)
+                Spacer(modifier = Modifier.height(4.dp))
+                LazyRow(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
                     modifier = Modifier.fillMaxWidth()
                 ) {
-                    Text("Select Video")
+                    itemsIndexed(clips) { index, path ->
+                        Box(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(6.dp))
+                                .background(Color(0xFF333333))
+                                .padding(horizontal = 12.dp, vertical = 6.dp)
+                        ) {
+                            Text(
+                                text = "#${index + 1} ${File(path).name}",
+                                color = Color.White,
+                                fontSize = 11.sp,
+                                maxLines = 1
+                            )
+                        }
+                    }
+                }
+                Spacer(modifier = Modifier.height(8.dp))
+            }
+
+            if (!timelineStarted) {
+                // Add clip + start buttons
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Button(
+                        onClick = { filePickerLauncher.launch("video/*") },
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Text("+ Add Clip")
+                    }
+                    if (clips.isNotEmpty()) {
+                        Button(
+                            onClick = {
+                                engineView?.engine?.let { engine ->
+                                    val videoClips = clips.map { VideoClip(it) }
+                                    if (engine.setTimeline(videoClips)) {
+                                        timelineStarted = true
+                                        statusText = ""
+                                    } else {
+                                        statusText = "Failed to set timeline"
+                                    }
+                                }
+                            },
+                            colors = ButtonDefaults.buttonColors(
+                                backgroundColor = Color(0xFF4CAF50)
+                            ),
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Text(
+                                if (clips.size == 1) "Play" else "Play ${clips.size} Clips",
+                                color = Color.White
+                            )
+                        }
+                    }
                 }
             }
 
-            if (videoLoaded) {
+            if (timelineStarted) {
                 // Time display
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -161,7 +225,7 @@ fun RenderEngineDemoScreen() {
                     Text(formatTime(durationMs), color = Color.White, fontSize = 12.sp)
                 }
 
-                // Seek bar: 拖动中用快速 seek（关键帧预览），松手后精确定位
+                // Seek bar
                 Slider(
                     value = if (durationMs > 0) currentPositionMs.toFloat() / durationMs.toFloat() else 0f,
                     onValueChange = { fraction ->
@@ -174,7 +238,7 @@ fun RenderEngineDemoScreen() {
                     modifier = Modifier.fillMaxWidth()
                 )
 
-                // Play/Pause button
+                // Play/Pause
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.Center
