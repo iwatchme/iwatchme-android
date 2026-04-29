@@ -30,9 +30,16 @@ set(SOURCES
     src/main/cpp/core/SourceNode.cpp
     src/main/cpp/core/OutputNode.cpp
     src/main/cpp/core/BlendNode.cpp
+    src/main/cpp/render/RenderGraphBuilder.cpp
     src/main/cpp/audio/AudioOutput.cpp
+    src/main/cpp/engine/DecoderConfig.cpp
+    src/main/cpp/engine/PlaybackSession.cpp
     src/main/cpp/engine/RenderEngine.cpp
     src/main/cpp/engine/Timeline.cpp
+    src/main/cpp/engine/TimelineValidator.cpp
+    src/main/cpp/pipeline/AudioPipeline.cpp
+    src/main/cpp/pipeline/VideoTrackPipeline.cpp
+    src/main/cpp/sync/VideoSyncController.cpp
 )
 
 add_library(render-engine SHARED ${SOURCES})
@@ -43,8 +50,11 @@ target_include_directories(render-engine PRIVATE
     src/main/cpp/gl
     src/main/cpp/decode
     src/main/cpp/core
+    src/main/cpp/render
     src/main/cpp/audio
     src/main/cpp/engine
+    src/main/cpp/pipeline
+    src/main/cpp/sync
 )
 
 # NDK system libraries
