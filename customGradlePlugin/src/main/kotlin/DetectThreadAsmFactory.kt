@@ -8,7 +8,7 @@ import org.objectweb.asm.Opcodes
 
 
 const val O_ThreadPoolExecutor = "java/util/concurrent/ThreadPoolExecutor"
-const val O_BaseProxyThreadPoolExecutor = "com/iwatchme/jetpackstarter/ProxyThreadExecutor2"
+const val O_BaseProxyThreadPoolExecutor = "com/iwatchme/android/ProxyThreadExecutor2"
 
 abstract class DetectThreadAsmFactory : AsmClassVisitorFactory<DetectThreadAsmParams> {
 
@@ -20,7 +20,7 @@ abstract class DetectThreadAsmFactory : AsmClassVisitorFactory<DetectThreadAsmPa
     }
 
     override fun isInstrumentable(classData: ClassData): Boolean {
-        return classData.className.contains("com.iwatchme.jetpackstarter")
+        return classData.className.contains("com.iwatchme.android")
                 || classData.className.contains("java.util.concurrent")
     }
 }

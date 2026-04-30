@@ -1,5 +1,5 @@
 <resources >
-    <style name="Theme.JetpackStarter" parent="Theme.MaterialComponents.DayNight.DarkActionBar">
+    <style name="Theme.IWatchMeAndroid" parent="Theme.MaterialComponents.DayNight.DarkActionBar">
         <item name="colorPrimary">@color/forest_500</item>
         <item name="colorPrimaryVariant">@color/forest_700</item>
         <item name="colorOnPrimary">@color/white</item>
@@ -9,9 +9,9 @@
         <item name="android:statusBarColor">?attr/colorPrimaryVariant</item>
     </style>
 
-    <style name="Theme.JetpackStarter.Splash" parent="Theme.SplashScreen">
+    <style name="Theme.IWatchMeAndroid.Splash" parent="Theme.SplashScreen">
         <item name="windowSplashScreenBackground">@color/splash_background</item>
         <item name="windowSplashScreenAnimatedIcon">@mipmap/ic_launcher</item>
-        <item name="postSplashScreenTheme">@style/Theme.JetpackStarter</item>
+        <item name="postSplashScreenTheme">@style/Theme.IWatchMeAndroid</item>
     </style>
 </resources>

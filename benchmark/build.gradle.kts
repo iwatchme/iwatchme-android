@@ -1,9 +1,9 @@
 plugins {
-    id("jetpackstarter.android.test")
+    id("iwatchme.android.test")
 }
 
 android {
-    namespace = "com.iwatchme.jetpackstarter.benchmark"
+    namespace = "com.iwatchme.android.benchmark"
     targetProjectPath = ":app"
 
     experimentalProperties["android.experimental.self-instrumenting"] = true

@@ -48,7 +48,7 @@
 - 关键实现：`StartupSession.kt`
 
 ### 3.2 App 启动链路
-- `JetpackApplication` 启动时接入新的 startup runtime。
+- `MainApplication` 启动时接入新的 startup runtime。
 - `MainActivity` 接入 SplashScreen，并延后 `reportFullyDrawn()`。
 - 增加 `legacy / optimized` 冷启动模式切换，模式值持久化到本地；切换后手动关闭并重新冷启动即可生效。
 - 首页改为 startup dashboard，直接展示：
@@ -75,13 +75,13 @@
 - 已补齐 `profileinstaller`、`androidx.baselineprofile`、`benchmark-macro-junit4` 等构建配置。
 
 ## 4. 关键文件
-- `app/src/main/java/com/iwatchme/jetpackstarter/startup/JetpackStartupManager.kt`
-- `app/src/main/java/com/iwatchme/jetpackstarter/startup/StartupComparisonSimulator.kt`
-- `app/src/main/java/com/iwatchme/jetpackstarter/startup/StartupInitializerBridge.kt`
-- `app/src/main/java/com/iwatchme/jetpackstarter/home/HomeScreen.kt`
+- `app/src/main/java/com/iwatchme/android/startup/JetpackStartupManager.kt`
+- `app/src/main/java/com/iwatchme/android/startup/StartupComparisonSimulator.kt`
+- `app/src/main/java/com/iwatchme/android/startup/StartupInitializerBridge.kt`
+- `app/src/main/java/com/iwatchme/android/home/HomeScreen.kt`
 - `startupRuntime/src/main/java/com/iwatchme/startupruntime/StartupSession.kt`
-- `benchmark/src/main/java/com/iwatchme/jetpackstarter/benchmark/ColdStartupBenchmark.kt`
-- `baselineprofile/src/main/java/com/iwatchme/jetpackstarter/baselineprofile/BaselineProfileGenerator.kt`
+- `benchmark/src/main/java/com/iwatchme/android/benchmark/ColdStartupBenchmark.kt`
+- `baselineprofile/src/main/java/com/iwatchme/android/baselineprofile/BaselineProfileGenerator.kt`
 
 ## 5. 数据边界说明
 - 文档中的 before/after 数字来自 `StartupComparisonSimulator`，属于稳定可复现的模拟对比数据。

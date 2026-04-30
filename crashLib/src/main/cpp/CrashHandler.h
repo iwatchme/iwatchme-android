@@ -2,8 +2,8 @@
 // Created by iwatchme on 2023/10/31.
 //
 
-#ifndef JETPACKSTARTER_CRASHHANDLER_H
-#define JETPACKSTARTER_CRASHHANDLER_H
+#ifndef IWATCHME_ANDROID_CRASHHANDLER_H
+#define IWATCHME_ANDROID_CRASHHANDLER_H
 
 #include <jni.h>
 #include <asm-generic/siginfo.h>
@@ -23,4 +23,4 @@ private:
 };
 
 
-#endif //JETPACKSTARTER_CRASHHANDLER_H
+#endif //IWATCHME_ANDROID_CRASHHANDLER_H

@@ -21,7 +21,7 @@ dependencyResolutionManagement {
         maven(url = "https://jitpack.io")
     }
 }
-rootProject.name = "JetpackStarter"
+rootProject.name = "iwatchme-android"
 include(":app")
 include(":baselineprofile")
 include(":benchmark")

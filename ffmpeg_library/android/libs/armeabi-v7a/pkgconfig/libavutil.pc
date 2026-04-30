@@ -1,7 +1,7 @@
-prefix=/Users/iwatchme/Projects/Android/JetpackStarter/ffmpeg/../ffmpeg_library/android/armeabi-v7a
+prefix=/Users/iwatchme/Projects/Android/iwatchme-android/ffmpeg/../ffmpeg_library/android/armeabi-v7a
 exec_prefix=${prefix}
-libdir=/Users/iwatchme/Projects/Android/JetpackStarter/ffmpeg/../ffmpeg_library/android/libs/armeabi-v7a
-includedir=/Users/iwatchme/Projects/Android/JetpackStarter/ffmpeg/../ffmpeg_library/android/armeabi-v7a/include
+libdir=/Users/iwatchme/Projects/Android/iwatchme-android/ffmpeg/../ffmpeg_library/android/libs/armeabi-v7a
+includedir=/Users/iwatchme/Projects/Android/iwatchme-android/ffmpeg/../ffmpeg_library/android/armeabi-v7a/include
 
 Name: libavutil
 Description: FFmpeg utility library
