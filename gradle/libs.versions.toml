@@ -25,6 +25,12 @@ compose-navigation = "2.5.3"
 compose-viewmodel = "2.5.1"
 compose-constraintlayout = "1.1.0-alpha10"
 exoplayer = "2.18.0"
+dagger = "2.51.1"
+media3 = "1.4.1"
+fragment-ktx = "1.8.5"
+lifecycle = "2.8.7"
+recyclerview = "1.3.2"
+constraintlayout = "2.2.0"
 accompanist = "0.22.0-rc"
 coil = "2.4.0"
 xunwind = "2.0.0"
@@ -73,6 +79,15 @@ compose-constraintlayout = { group = "androidx.constraintlayout", name = "constr
 exoplayer-core = { group = "com.google.android.exoplayer", name = "exoplayer-core", version.ref = "exoplayer" }
 exoplayer-ui = { group = "com.google.android.exoplayer", name = "exoplayer-ui", version.ref = "exoplayer" }
 
+dagger = { group = "com.google.dagger", name = "dagger", version.ref = "dagger" }
+dagger-compiler = { group = "com.google.dagger", name = "dagger-compiler", version.ref = "dagger" }
+media3-exoplayer = { group = "androidx.media3", name = "media3-exoplayer", version.ref = "media3" }
+media3-ui = { group = "androidx.media3", name = "media3-ui", version.ref = "media3" }
+fragment-ktx = { group = "androidx.fragment", name = "fragment-ktx", version.ref = "fragment-ktx" }
+lifecycle-runtime-ktx = { group = "androidx.lifecycle", name = "lifecycle-runtime-ktx", version.ref = "lifecycle" }
+recyclerview = { group = "androidx.recyclerview", name = "recyclerview", version.ref = "recyclerview" }
+constraintlayout = { group = "androidx.constraintlayout", name = "constraintlayout", version.ref = "constraintlayout" }
+
 permission = { group = "com.google.accompanist", name = "accompanist-permissions", version.ref = "accompanist" }
 image = { group = "io.coil-kt", name = "coil-compose", version.ref = "coil" }
 unwind = { group = "io.github.hexhacking", name = "xunwind", version.ref = "xunwind" }
@@ -90,4 +105,5 @@ android-library = { id = "com.android.library", version.ref = "androidGradlePlug
 kotlin-android = { id = "org.jetbrains.kotlin.android", version.ref = "kotlin" }
 kotlin-parcelize = { id = "org.jetbrains.kotlin.plugin.parcelize",  version.ref = "kotlinPlugin"  }
 android-test = { id = "com.android.test", version.ref = "androidGradlePlugin" }
+ksp = { id = "com.google.devtools.ksp", version = "1.9.0-1.0.13" }
 baselineprofile = { id = "androidx.baselineprofile", version.ref = "baselineprofile-plugin" }

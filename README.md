@@ -15,6 +15,7 @@ This is my personal playground for exploring various Android development topics.
 | `render-engine` | Video playback engine using FFmpeg + MediaCodec + OpenGL ES |
 | `startupLab` | Startup optimization experiments and inspector UI |
 | `startupRuntime` | Lightweight startup task orchestration framework (DAG-based) |
+| `player` | Multi-scope Dagger 2 video player with ExoPlayer (Media3) |
 | `customCoroutine` | Kotlin coroutine internals exploration |
 | `benchmark` | Macrobenchmark cold-start measurements |
 | `baselineprofile` | Baseline profile generation for AOT optimization |
@@ -24,6 +25,7 @@ This is my personal playground for exploring various Android development topics.
 ## Tech Stack
 
 - Kotlin + Jetpack Compose
+- Dagger 2 (KSP) + Media3 ExoPlayer
 - Gradle convention plugins (build-logic)
 - FFmpeg + OpenGL ES (native rendering)
 - JNI / C++ (crash capture)
