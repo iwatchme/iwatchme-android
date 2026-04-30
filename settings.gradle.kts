@@ -10,7 +10,7 @@ pluginManagement {
     }
 }
 
-includeBuild("customGradlePlugin")
+includeBuild("threadDetectPlugin")
 
 dependencyResolutionManagement {
     repositories {

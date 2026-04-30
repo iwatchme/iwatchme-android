@@ -1,7 +1,7 @@
 plugins {
     id("iwatchme.android.application.compose")
     alias(libs.plugins.baselineprofile)
-    id("custom-gradle-plugin")
+    id("thread-detect")
 }
 
 android {
@@ -40,7 +40,7 @@ android {
     }
 }
 
-customGradlePlugin {
+threadDetect {
     enableThreadDetect = true
 }
 
