@@ -5,9 +5,8 @@
 
 [versions]
 androidGradlePlugin = "8.12.0"
-kotlinPlugin = "1.8.10"
-kotlin = "1.9.0"
-coroutines = "1.7.3"
+kotlin = "2.0.21"
+coroutines = "1.9.0"
 appcompat = "1.6.1"
 core-ktx = "1.9.0"
 material = "1.8.0"
@@ -96,6 +95,7 @@ easypermissions = { group = "pub.devrel", name = "easypermissions", version = "3
 # Gradle plugins as libraries (for build-logic convention plugins)
 android-gradlePlugin = { group = "com.android.tools.build", name = "gradle", version.ref = "androidGradlePlugin" }
 kotlin-gradlePlugin = { group = "org.jetbrains.kotlin", name = "kotlin-gradle-plugin", version.ref = "kotlin" }
+kotlin-compose-compiler = { group = "org.jetbrains.kotlin", name = "compose-compiler-gradle-plugin", version.ref = "kotlin" }
 
 [bundles]
 
@@ -103,7 +103,8 @@ kotlin-gradlePlugin = { group = "org.jetbrains.kotlin", name = "kotlin-gradle-pl
 android-application = { id = "com.android.application", version.ref = "androidGradlePlugin" }
 android-library = { id = "com.android.library", version.ref = "androidGradlePlugin" }
 kotlin-android = { id = "org.jetbrains.kotlin.android", version.ref = "kotlin" }
-kotlin-parcelize = { id = "org.jetbrains.kotlin.plugin.parcelize",  version.ref = "kotlinPlugin"  }
+kotlin-parcelize = { id = "org.jetbrains.kotlin.plugin.parcelize",  version.ref = "kotlin"  }
 android-test = { id = "com.android.test", version.ref = "androidGradlePlugin" }
-ksp = { id = "com.google.devtools.ksp", version = "1.9.0-1.0.13" }
+ksp = { id = "com.google.devtools.ksp", version = "2.0.21-1.0.28" }
+kotlin-compose = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }
 baselineprofile = { id = "androidx.baselineprofile", version.ref = "baselineprofile-plugin" }
