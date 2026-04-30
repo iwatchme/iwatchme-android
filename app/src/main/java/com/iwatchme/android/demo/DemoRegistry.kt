@@ -1,6 +1,7 @@
 package com.iwatchme.android.demo
 
 import com.iwatchme.android.demo.crash.CrashLibDemoScreen
+import com.iwatchme.android.demo.player.PlayerDemoScreen
 import com.iwatchme.android.demo.renderengine.RenderEngineDemoScreen
 import com.iwatchme.startuplab.ui.StartupInspectorScreen
 
@@ -21,6 +22,14 @@ object DemoRegistry {
             description = "Initialize CrashLib manually and trigger a native crash for verification.",
             content = {
                 CrashLibDemoScreen()
+            },
+        ),
+        DemoEntry(
+            route = "demo/player",
+            title = "Player",
+            description = "Multi-scope Dagger 2 video player with ExoPlayer (Media3), demonstrating PageScope / BizScope / MediaScope architecture.",
+            content = {
+                PlayerDemoScreen()
             },
         ),
         DemoEntry(

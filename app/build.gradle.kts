@@ -60,6 +60,7 @@ dependencies {
     implementation(project(":crashLib"))
     implementation(project(":startupLab"))
     implementation(project(":render-engine"))
+    implementation(project(":player"))
     baselineProfile(project(":baselineprofile"))
 
     testImplementation(libs.junit)
