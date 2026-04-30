@@ -6,9 +6,10 @@ import org.objectweb.asm.ClassVisitor
 import org.objectweb.asm.MethodVisitor
 import org.objectweb.asm.Opcodes
 
-
-const val O_ThreadPoolExecutor = "java/util/concurrent/ThreadPoolExecutor"
-const val O_BaseProxyThreadPoolExecutor = "com/iwatchme/android/ProxyThreadExecutor2"
+private const val THREAD_OWNER = "java/lang/Thread"
+private const val EXECUTOR_OWNER = "java/util/concurrent/ThreadPoolExecutor"
+private const val EXECUTORS_OWNER = "java/util/concurrent/Executors"
+private const val DETECTOR_OWNER = "com/iwatchme/android/detect/ThreadDetector"
 
 abstract class DetectThreadAsmFactory : AsmClassVisitorFactory<DetectThreadAsmParams> {
 
@@ -16,31 +17,26 @@ abstract class DetectThreadAsmFactory : AsmClassVisitorFactory<DetectThreadAsmPa
         classContext: ClassContext,
         nextClassVisitor: ClassVisitor
     ): ClassVisitor {
-        return ThreadDetectClassVisitor(Opcodes.ASM6, nextClassVisitor)
+        return ThreadDetectClassVisitor(Opcodes.ASM9, nextClassVisitor)
     }
 
     override fun isInstrumentable(classData: ClassData): Boolean {
-        return classData.className.contains("com.iwatchme.android")
-                || classData.className.contains("java.util.concurrent")
+        val name = classData.className
+        if (name.startsWith("com.iwatchme.android.detect.ThreadDetector")) return false
+        if (name.startsWith("com.iwatchme")) return true
+        if (name.startsWith("kotlinx.coroutines.scheduling")) return true
+        return false
     }
 }
 
+open class DetectThreadAsmParams : InstrumentationParameters
 
-open class DetectThreadAsmParams : InstrumentationParameters {
+private class ThreadDetectClassVisitor(
+    api: Int,
+    classVisitor: ClassVisitor
+) : ClassVisitor(api, classVisitor) {
 
-}
-
-
-private class ThreadDetectClassVisitor(val api: Int, val classVisitor: ClassVisitor) :
-    ClassVisitor(api, classVisitor) {
-
-    var className: String = ""
-
-
-    override fun visitSource(source: String?, debug: String?) {
-        super.visitSource(source, debug)
-        //println("visitSource: ${source} ${debug}")
-    }
+    private var className: String = ""
 
     override fun visit(
         version: Int,
@@ -50,27 +46,9 @@ private class ThreadDetectClassVisitor(val api: Int, val classVisitor: ClassVisi
         superName: String?,
         interfaces: Array<out String>?
     ) {
-        // println("visit: ${version} ${access} ${name} ${signature} ${superName} ${interfaces}")
         className = name ?: ""
         super.visit(version, access, name, signature, superName, interfaces)
     }
-
-    override fun visitInnerClass(
-        name: String?,
-        outerName: String?,
-        innerName: String?,
-        access: Int
-    ) {
-        // println("visitInnerClass: ${name} ${outerName} ${innerName} ${access}")
-        super.visitInnerClass(name, outerName, innerName, access)
-
-    }
-
-    override fun visitOuterClass(owner: String?, name: String?, descriptor: String?) {
-        // println("visitOutClass: ${owner} ${name} ${descriptor}")
-        super.visitOuterClass(owner, name, descriptor)
-    }
-
 
     override fun visitMethod(
         access: Int,
@@ -79,101 +57,67 @@ private class ThreadDetectClassVisitor(val api: Int, val classVisitor: ClassVisi
         signature: String?,
         exceptions: Array<out String>?
     ): MethodVisitor {
-        // println("out: ${access} ${name} ${descriptor} ${signature} ${exceptions}")
-        val method = super.visitMethod(access, name, descriptor, signature, exceptions)
-        return DetectThreadMethod(api, method, className)
-    }
-
-
-    private class DetectThreadMethod(
-        api: Int,
-        methodVisitor: MethodVisitor,
-        val className: String
-    ) :
-        MethodVisitor(api, methodVisitor) {
-
-        override fun visitMethodInsn(
-            opcode: Int,
-            owner: String?,
-            name: String?,
-            descriptor: String?,
-            isInterface: Boolean
-        ) {
-            // println("in: ${opcode} ${owner} ${name} ${descriptor} ${isInterface}")
-            if (opcode == Opcodes.INVOKESPECIAL && owner == "java/lang/Thread" && name == "<init>" && descriptor == "(Ljava/lang/Runnable;)V") {
-                mv.visitLdcInsn("$className");
-                mv.visitMethodInsn(
-                    opcode,
-                    owner,
-                    name,
-                    "(Ljava/lang/Runnable;Ljava/lang/String;)V",
-                    isInterface
-                )
-                return
-            } else if (owner.equals(O_ThreadPoolExecutor) && name == "<init>") {
-                println("owner: $owner name: $name descriptor: $descriptor")
-                when (descriptor) {
-                    "(IIJLjava/util/concurrent/TimeUnit;Ljava/util/concurrent/BlockingQueue;)V" -> {
-                        mv.visitLdcInsn(className);
-                        mv.visitMethodInsn(
-                            opcode,
-                            O_BaseProxyThreadPoolExecutor,
-                            name,
-                            "(IIJLjava/util/concurrent/TimeUnit;Ljava/util/concurrent/BlockingQueue;Ljava/lang/String;)V",
-                            false
-                        );
-                    }
-
-                    "(IIJLjava/util/concurrent/TimeUnit;Ljava/util/concurrent/BlockingQueue;Ljava/util/concurrent/ThreadFactory;)V" -> {
-                        mv.visitLdcInsn(className);
-                        mv.visitMethodInsn(
-                            opcode,
-                            O_BaseProxyThreadPoolExecutor,
-                            name,
-                            "(IIJLjava/util/concurrent/TimeUnit;Ljava/util/concurrent/BlockingQueue;Ljava/util/concurrent/ThreadFactory;Ljava/lang/String;)V",
-                            false
-                        );
-                    }
-
-                    "(IIJLjava/util/concurrent/TimeUnit;Ljava/util/concurrent/BlockingQueue;Ljava/util/concurrent/RejectedExecutionHandler;)V" -> {
-                        mv.visitLdcInsn(className);
-                        mv.visitMethodInsn(
-                            opcode,
-                            O_BaseProxyThreadPoolExecutor,
-                            name,
-                            "(IIJLjava/util/concurrent/TimeUnit;Ljava/util/concurrent/BlockingQueue;Ljava/util/concurrent/RejectedExecutionHandler;Ljava/lang/String;)V",
-                            false
-                        );
-                    }
-
-                    "(IIJLjava/util/concurrent/TimeUnit;Ljava/util/concurrent/BlockingQueue;Ljava/util/concurrent/ThreadFactory;Ljava/util/concurrent/RejectedExecutionHandler;)V" -> {
-                        mv.visitLdcInsn(className);
-                        mv.visitMethodInsn(
-                            opcode,
-                            O_BaseProxyThreadPoolExecutor,
-                            name,
-                            "(IIJLjava/util/concurrent/TimeUnit;Ljava/util/concurrent/BlockingQueue;Ljava/util/concurrent/ThreadFactory;Ljava/util/concurrent/RejectedExecutionHandler;Ljava/lang/String;)V",
-                            false
-                        );
-                    }
-
-                    else -> {
-                        mv.visitMethodInsn(
-                            opcode,
-                            O_BaseProxyThreadPoolExecutor,
-                            name,
-                            descriptor,
-                            false
-                        );
-                    }
-                }
-                return;
-            }
-
-            super.visitMethodInsn(opcode, owner, name, descriptor, isInterface)
-        }
-
+        val mv = super.visitMethod(access, name, descriptor, signature, exceptions)
+        return DetectThreadMethodVisitor(api, mv, className)
     }
 }
 
+private class DetectThreadMethodVisitor(
+    api: Int,
+    methodVisitor: MethodVisitor,
+    private val className: String
+) : MethodVisitor(api, methodVisitor) {
 
+    override fun visitMethodInsn(
+        opcode: Int,
+        owner: String?,
+        name: String?,
+        descriptor: String?,
+        isInterface: Boolean
+    ) {
+        // Emit the original instruction first
+        super.visitMethodInsn(opcode, owner, name, descriptor, isInterface)
+
+        // Detect Thread.<init> (all constructor signatures)
+        if (opcode == Opcodes.INVOKESPECIAL && owner == THREAD_OWNER && name == "<init>") {
+            mv.visitLdcInsn(className)
+            mv.visitLdcInsn(descriptor ?: "")
+            mv.visitMethodInsn(
+                Opcodes.INVOKESTATIC,
+                DETECTOR_OWNER,
+                "onThreadInit",
+                "(Ljava/lang/String;Ljava/lang/String;)V",
+                false
+            )
+            return
+        }
+
+        // Detect ThreadPoolExecutor.<init> (log only, no replacement)
+        if (opcode == Opcodes.INVOKESPECIAL && owner == EXECUTOR_OWNER && name == "<init>") {
+            mv.visitLdcInsn(className)
+            mv.visitLdcInsn(descriptor ?: "")
+            mv.visitMethodInsn(
+                Opcodes.INVOKESTATIC,
+                DETECTOR_OWNER,
+                "onExecutorInit",
+                "(Ljava/lang/String;Ljava/lang/String;)V",
+                false
+            )
+            return
+        }
+
+        // Detect Executors.newXxx() factory methods
+        if (opcode == Opcodes.INVOKESTATIC && owner == EXECUTORS_OWNER && name?.startsWith("new") == true) {
+            mv.visitLdcInsn(className)
+            mv.visitLdcInsn(name)
+            mv.visitMethodInsn(
+                Opcodes.INVOKESTATIC,
+                DETECTOR_OWNER,
+                "onExecutorFactoryCall",
+                "(Ljava/lang/String;Ljava/lang/String;)V",
+                false
+            )
+            return
+        }
+    }
+}

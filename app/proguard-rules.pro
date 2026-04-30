@@ -19,3 +19,6 @@
 # If you keep the line number information, uncomment this to
 # hide the original source file name.
 #-renamesourcefileattribute SourceFile
+
+# Keep ThreadDetector for ASM-injected bytecode references
+-keep class com.iwatchme.android.detect.ThreadDetector { *; }

@@ -16,7 +16,6 @@ This is my personal playground for exploring various Android development topics.
 | `startupLab` | Startup optimization experiments and inspector UI |
 | `startupRuntime` | Lightweight startup task orchestration framework (DAG-based) |
 | `player` | Multi-scope Dagger 2 video player with ExoPlayer (Media3) |
-| `customCoroutine` | Kotlin coroutine internals exploration |
 | `benchmark` | Macrobenchmark cold-start measurements |
 | `baselineprofile` | Baseline profile generation for AOT optimization |
 | `build-logic` | Gradle convention plugins for shared build configuration |

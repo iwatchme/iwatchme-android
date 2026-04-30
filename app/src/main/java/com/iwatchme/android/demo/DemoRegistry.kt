@@ -3,11 +3,20 @@ package com.iwatchme.android.demo
 import com.iwatchme.android.demo.crash.CrashLibDemoScreen
 import com.iwatchme.android.demo.player.PlayerDemoScreen
 import com.iwatchme.android.demo.renderengine.RenderEngineDemoScreen
+import com.iwatchme.android.demo.thread.ThreadDetectorScreen
 import com.iwatchme.startuplab.ui.StartupInspectorScreen
 
 object DemoRegistry {
 
     private val registeredDemos: List<DemoEntry> = listOf(
+        DemoEntry(
+            route = "demo/thread-detector",
+            title = "Thread Inspector",
+            description = "View all detected Thread, ThreadPoolExecutor, and Executors.newXxx() creation events, including coroutine dispatcher threads.",
+            content = {
+                ThreadDetectorScreen()
+            },
+        ),
         DemoEntry(
             route = "demo/startup-inspector",
             title = "Startup Inspector",

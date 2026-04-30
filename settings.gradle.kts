@@ -25,7 +25,6 @@ rootProject.name = "iwatchme-android"
 include(":app")
 include(":baselineprofile")
 include(":benchmark")
-include(":customCoroutine")
 include(":startupRuntime")
 include(":startupLab")
 include(":crashLib")
