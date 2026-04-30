@@ -5,7 +5,7 @@ plugins {
     `kotlin-dsl`
 }
 
-group = "com.iwatchme.jetpackstarter.buildlogic"
+group = "com.iwatchme.android.buildlogic"
 
 java {
     sourceCompatibility = JavaVersion.VERSION_17
@@ -33,24 +33,24 @@ tasks {
 gradlePlugin {
     plugins {
         register("androidApplication") {
-            id = "jetpackstarter.android.application"
-            implementationClass = "com.iwatchme.jetpackstarter.AndroidApplicationConventionPlugin"
+            id = "iwatchme.android.application"
+            implementationClass = "com.iwatchme.android.AndroidApplicationConventionPlugin"
         }
         register("androidApplicationCompose") {
-            id = "jetpackstarter.android.application.compose"
-            implementationClass = "com.iwatchme.jetpackstarter.AndroidApplicationComposeConventionPlugin"
+            id = "iwatchme.android.application.compose"
+            implementationClass = "com.iwatchme.android.AndroidApplicationComposeConventionPlugin"
         }
         register("androidLibrary") {
-            id = "jetpackstarter.android.library"
-            implementationClass = "com.iwatchme.jetpackstarter.AndroidLibraryConventionPlugin"
+            id = "iwatchme.android.library"
+            implementationClass = "com.iwatchme.android.AndroidLibraryConventionPlugin"
         }
         register("androidLibraryCompose") {
-            id = "jetpackstarter.android.library.compose"
-            implementationClass = "com.iwatchme.jetpackstarter.AndroidLibraryComposeConventionPlugin"
+            id = "iwatchme.android.library.compose"
+            implementationClass = "com.iwatchme.android.AndroidLibraryComposeConventionPlugin"
         }
         register("androidTest") {
-            id = "jetpackstarter.android.test"
-            implementationClass = "com.iwatchme.jetpackstarter.AndroidTestConventionPlugin"
+            id = "iwatchme.android.test"
+            implementationClass = "com.iwatchme.android.AndroidTestConventionPlugin"
         }
     }
 }

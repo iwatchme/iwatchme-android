@@ -1,10 +1,10 @@
 plugins {
-    id("jetpackstarter.android.test")
+    id("iwatchme.android.test")
     alias(libs.plugins.baselineprofile)
 }
 
 android {
-    namespace = "com.iwatchme.jetpackstarter.baselineprofile"
+    namespace = "com.iwatchme.android.baselineprofile"
     targetProjectPath = ":app"
 
     experimentalProperties["android.experimental.self-instrumenting"] = true

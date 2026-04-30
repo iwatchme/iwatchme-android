@@ -16,7 +16,7 @@
 set -e
 
 MODE="${1:-method}"
-PACKAGE="com.iwatchme.jetpackstarter"
+PACKAGE="com.iwatchme.android"
 ACTIVITY="${PACKAGE}/.MainActivity"
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 TIMESTAMP="$(date +%Y%m%d_%H%M%S)"

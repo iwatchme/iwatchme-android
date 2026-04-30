@@ -1,15 +1,15 @@
 plugins {
-    id("jetpackstarter.android.application.compose")
+    id("iwatchme.android.application.compose")
     alias(libs.plugins.baselineprofile)
     id("custom-gradle-plugin")
 }
 
 android {
     ndkVersion = "27.2.12479018"
-    namespace = "com.iwatchme.jetpackstarter"
+    namespace = "com.iwatchme.android"
 
     defaultConfig {
-        applicationId = "com.iwatchme.jetpackstarter"
+        applicationId = "com.iwatchme.android"
         versionCode = 1
         versionName = "1.0"
 

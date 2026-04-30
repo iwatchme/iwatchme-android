@@ -1,5 +1,5 @@
 plugins {
-    id("jetpackstarter.android.library")
+    id("iwatchme.android.library")
 }
 
 android {

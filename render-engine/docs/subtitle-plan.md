@@ -21,7 +21,7 @@ render-engine 已完成视频播放、音画同步、多片段时间线、多轨
 沿用 FFmpeg 的 prebuilt 模式：
 
 ```
-JetpackStarter/
+iwatchme-android/
   freetype_library/
     android/
       arm64-v8a/
