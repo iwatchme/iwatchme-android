@@ -334,483 +334,41 @@ void PlaybackSession::buildRenderTree(int surfaceWidth, int surfaceHeight) {
 }
 
 void PlaybackSession::renderThreadFunc() {
-    JNIEnv* env = nullptr;
-    jvm_->AttachCurrentThread(&env, nullptr);
+    RenderLoopContext ctx;
+    if (!attachThreadAndInitEgl(ctx)) {
+        return;
+    }
+
+    while (running_.load()) {
+        if (handleSurfaceLifecycle(ctx)) continue;
+        if (handleSourceLifecycle(ctx)) continue;
+        if (handlePendingFastSeek(ctx)) continue;
+        if (handlePendingExactSeek(ctx)) continue;
+        if (handleIdleState(ctx)) continue;
+        if (handleTimelineEof(ctx)) continue;
+
+        processPlaybackTick(ctx);
+    }
+
+    teardownRenderThread(ctx);
+}
+
+bool PlaybackSession::attachThreadAndInitEgl(RenderLoopContext& ctx) {
+    jvm_->AttachCurrentThread(&ctx.env, nullptr);
 
     if (!eglCore_.init()) {
         LOGE("PlaybackSession: EGL init failed");
         jvm_->DetachCurrentThread();
-        return;
+        ctx.env = nullptr;
+        return false;
     }
 
     LOGI("PlaybackSession: render thread started");
+    return true;
+}
 
-    int surfaceWidth = 0, surfaceHeight = 0;
-    bool eof = false;
-
-    VideoSyncController syncController;
-    int64_t lastVideoDiagLogUs = 0;
-    int64_t lastPerfDiagLogUs = 0;
-
-    while (running_.load()) {
-        if (windowChanged_.load()) {
-            windowChanged_.store(false);
-
-            if (eglSurface_ != EGL_NO_SURFACE) {
-                eglCore_.makeNothingCurrent();
-                eglCore_.destroySurface(eglSurface_);
-                eglSurface_ = EGL_NO_SURFACE;
-            }
-
-            std::lock_guard<std::mutex> lock(windowMutex_);
-            if (window_) {
-                eglSurface_ = eglCore_.createWindowSurface(window_);
-                if (eglSurface_ != EGL_NO_SURFACE) {
-                    eglCore_.makeCurrent(eglSurface_);
-                    surfaceWidth = ANativeWindow_getWidth(window_);
-                    surfaceHeight = ANativeWindow_getHeight(window_);
-                    glViewport(0, 0, surfaceWidth, surfaceHeight);
-                    LOGI("PlaybackSession: EGL surface %dx%d", surfaceWidth, surfaceHeight);
-                }
-            }
-        }
-
-        if (videoSourceChanged_.load()) {
-            if (eglSurface_ != EGL_NO_SURFACE) {
-                uint32_t transitionGeneration = timelineGeneration_.load();
-                videoSourceChanged_.store(false);
-                if (initDecodePipeline(env)) {
-                    buildRenderTree(surfaceWidth, surfaceHeight);
-                    syncController.reset();
-                    eof = false;
-                    LOGI("PlaybackSession: ready, fps=%.1f, overlay=%s",
-                         primaryTrack_->fps(),
-                         (hasOverlay_ && overlayTrack_ && overlayTrack_->sourceNode()) ? "yes" : "no");
-                    LOGI("AVSYNC transition source-ready generation=%u audio=%d",
-                         transitionGeneration,
-                         (audioPipeline_ && audioPipeline_->hasAudio()) ? 1 : 0);
-                }
-                endTimelineTransition(transitionGeneration);
-            }
-        }
-
-        int64_t fastTarget = seekFastTargetUs_.exchange(-1);
-        if (fastTarget >= 0 && pipelineInitialized_) {
-            uint32_t transitionGeneration = timelineGeneration_.load();
-
-            int64_t sourceSeekPos = fastTarget;
-            if (primaryTrack_ && !primaryTrack_->timeline().isEmpty()) {
-                ClipLookup lookup = primaryTrack_->timeline().resolve(fastTarget);
-                if (lookup.clipIndex < 0) lookup = primaryTrack_->timeline().resolve(primaryTrack_->timeline().durationUs() - 1);
-                if (lookup.clipIndex != primaryTrack_->activeClipIndex()) {
-                    switchToClip(lookup.clipIndex, lookup.sourcePositionUs, env);
-                } else {
-                    primaryTrack_->seekInCurrentClip(lookup.sourcePositionUs);
-                }
-                sourceSeekPos = lookup.sourcePositionUs;
-            } else if (primaryTrack_) {
-                primaryTrack_->seekInCurrentClip(sourceSeekPos);
-            }
-            syncController.reset();
-            eof = false;
-
-            AVRational tb = primaryTrack_->videoTimeBase();
-            bool gotFrame = false;
-            for (int attempt = 0; attempt < 100 && !gotFrame && running_.load(); attempt++) {
-                primaryTrack_->queueVideoPacketWithTimeout(50000);
-
-                HwDecoder::DecodedFrame frame;
-                if (primaryTrack_->dequeueFrame(frame, 5000)) {
-                    int64_t framePtsUs = av_rescale_q(frame.pts, tb, {1, 1000000});
-
-                    primaryTrack_->releaseFrame(frame.bufferIndex, true);
-                    primaryTrack_->consumeRenderedFrame(env, 50);
-                    currentPositionUs_.store(primaryTrack_->mapSourcePtsToTimelineUs(framePtsUs));
-
-                    if (hasOverlay_ && overlayTrack_ && overlayTrack_->sourceNode()) {
-                        ClipLookup oLookup = overlayTrack_->timeline().resolve(fastTarget);
-                        if (oLookup.clipIndex >= 0) {
-                            bool overlayReady = (oLookup.clipIndex != overlayTrack_->activeClipIndex())
-                                ? overlayTrack_->switchToClip(oLookup.clipIndex, oLookup.sourcePositionUs, env)
-                                : overlayTrack_->seekInCurrentClip(oLookup.sourcePositionUs);
-                            for (int oa = 0; overlayReady && oa < 50; oa++) {
-                                overlayTrack_->queueVideoPacketWithTimeout(10000);
-                                HwDecoder::DecodedFrame oFrame;
-                                if (overlayTrack_->dequeueFrame(oFrame, 5000)) {
-                                    int64_t oPtsUs = av_rescale_q(oFrame.pts, overlayTrack_->videoTimeBase(), {1, 1000000});
-                                    if (overlayTrack_->isFrameBeforeTrim(oPtsUs)) {
-                                        overlayTrack_->releaseFrame(oFrame.bufferIndex, false);
-                                        continue;
-                                    }
-                                    if (overlayTrack_->isFrameAfterTrim(oPtsUs)) {
-                                        overlayTrack_->releaseFrame(oFrame.bufferIndex, false);
-                                        break;
-                                    }
-                                    overlayTrack_->releaseFrame(oFrame.bufferIndex, true);
-                                    overlayTrack_->consumeRenderedFrame(env, 50);
-                                    overlayTrack_->sourceNode()->setActive(true);
-                                    break;
-                                }
-                            }
-                        } else {
-                            overlayTrack_->sourceNode()->setActive(false);
-                        }
-                    }
-
-                    if (auto* blendNode = renderGraphBuilder_ ? renderGraphBuilder_->blendNode() : nullptr) {
-                        blendNode->overlayAlpha = overlayAlpha_.load();
-                    }
-                    if (auto* outputNode = renderGraphBuilder_ ? renderGraphBuilder_->outputNode() : nullptr) {
-                        outputNode->outputWidth = surfaceWidth;
-                        outputNode->outputHeight = surfaceHeight;
-                        outputNode->execute(framePtsUs);
-                    }
-                    eglCore_.swapBuffers(eglSurface_);
-                    gotFrame = true;
-                }
-            }
-            if (seekFastTargetUs_.load() >= 0) continue;
-            LOGI("AVSYNC transition seekFast-ready generation=%u currentPosUs=%lld",
-                 transitionGeneration, (long long)currentPositionUs_.load());
-            endTimelineTransition(transitionGeneration);
-        }
-
-        int64_t seekTarget = seekTargetUs_.exchange(-1);
-        if (seekTarget >= 0 && pipelineInitialized_) {
-            uint32_t transitionGeneration = timelineGeneration_.load();
-
-            int64_t sourceSeekTarget = seekTarget;
-            if (primaryTrack_ && !primaryTrack_->timeline().isEmpty()) {
-                ClipLookup lookup = primaryTrack_->timeline().resolve(seekTarget);
-                if (lookup.clipIndex < 0) lookup = primaryTrack_->timeline().resolve(primaryTrack_->timeline().durationUs() - 1);
-                if (lookup.clipIndex != primaryTrack_->activeClipIndex()) {
-                    switchToClip(lookup.clipIndex, lookup.sourcePositionUs, env);
-                } else {
-                    primaryTrack_->seekInCurrentClip(lookup.sourcePositionUs);
-                }
-                sourceSeekTarget = lookup.sourcePositionUs;
-            } else if (primaryTrack_) {
-                primaryTrack_->seekInCurrentClip(sourceSeekTarget);
-            }
-            syncController.reset();
-            eof = false;
-
-            AVRational tb = primaryTrack_->videoTimeBase();
-            bool reachedTarget = false;
-            int skipCount = 0;
-
-            while (!reachedTarget && running_.load()) {
-                while (!eof) {
-                    if (!primaryTrack_->queueVideoPacketWithTimeout(50000)) {
-                        if (primaryTrack_->isEof()) {
-                            eof = true;
-                        }
-                        break;
-                    }
-                }
-
-                HwDecoder::DecodedFrame frame;
-                if (!primaryTrack_->dequeueFrame(frame, 30000)) {
-                    if (eof) break;
-                    continue;
-                }
-
-                int64_t framePtsUs = av_rescale_q(frame.pts, tb, {1, 1000000});
-
-                if (framePtsUs >= sourceSeekTarget) {
-                    primaryTrack_->releaseFrame(frame.bufferIndex, true);
-                    primaryTrack_->consumeRenderedFrame(env, 50);
-                    currentPositionUs_.store(primaryTrack_->mapSourcePtsToTimelineUs(framePtsUs));
-
-                    if (hasOverlay_ && overlayTrack_ && overlayTrack_->sourceNode()) {
-                        ClipLookup oLookup = overlayTrack_->timeline().resolve(seekTarget);
-                        if (oLookup.clipIndex >= 0) {
-                            bool overlayReady = (oLookup.clipIndex != overlayTrack_->activeClipIndex())
-                                ? overlayTrack_->switchToClip(oLookup.clipIndex, oLookup.sourcePositionUs, env)
-                                : overlayTrack_->seekInCurrentClip(oLookup.sourcePositionUs);
-                            for (int oa = 0; overlayReady && oa < 50; oa++) {
-                                overlayTrack_->queueVideoPacketWithTimeout(10000);
-                                HwDecoder::DecodedFrame oFrame;
-                                if (overlayTrack_->dequeueFrame(oFrame, 5000)) {
-                                    int64_t oPtsUs = av_rescale_q(oFrame.pts, overlayTrack_->videoTimeBase(), {1, 1000000});
-                                    if (overlayTrack_->isFrameBeforeTrim(oPtsUs)) {
-                                        overlayTrack_->releaseFrame(oFrame.bufferIndex, false);
-                                        continue;
-                                    }
-                                    if (overlayTrack_->isFrameAfterTrim(oPtsUs)) {
-                                        overlayTrack_->releaseFrame(oFrame.bufferIndex, false);
-                                        break;
-                                    }
-                                    overlayTrack_->releaseFrame(oFrame.bufferIndex, true);
-                                    overlayTrack_->consumeRenderedFrame(env, 50);
-                                    overlayTrack_->sourceNode()->setActive(true);
-                                    break;
-                                }
-                            }
-                        } else {
-                            overlayTrack_->sourceNode()->setActive(false);
-                        }
-                    }
-
-                    if (auto* blendNode = renderGraphBuilder_ ? renderGraphBuilder_->blendNode() : nullptr) {
-                        blendNode->overlayAlpha = overlayAlpha_.load();
-                    }
-                    if (auto* outputNode = renderGraphBuilder_ ? renderGraphBuilder_->outputNode() : nullptr) {
-                        outputNode->outputWidth = surfaceWidth;
-                        outputNode->outputHeight = surfaceHeight;
-                        outputNode->execute(framePtsUs);
-                    }
-                    eglCore_.swapBuffers(eglSurface_);
-
-                    reachedTarget = true;
-                } else {
-                    primaryTrack_->releaseFrame(frame.bufferIndex, true);
-                    primaryTrack_->consumeRenderedFrame(env, 50);
-                    skipCount++;
-                }
-            }
-            currentPositionUs_.store(seekTarget);
-            LOGI("AVSYNC transition seek-ready generation=%u requestedUs=%lld sourceTargetUs=%lld skipCount=%d audioClockUs=%lld",
-                 transitionGeneration,
-                 (long long)seekTarget,
-                 (long long)sourceSeekTarget,
-                 skipCount,
-                 (long long)getAudioClockUs());
-            endTimelineTransition(transitionGeneration);
-        }
-
-        if (!playing_.load() || eglSurface_ == EGL_NO_SURFACE || !pipelineInitialized_) {
-            syncController.reset();
-            std::unique_lock<std::mutex> lock(cmdMutex_);
-            cmdCond_.wait_for(lock, std::chrono::milliseconds(50));
-            continue;
-        }
-
-        if (eof) {
-            int next = primaryTrack_->activeClipIndex() + 1;
-            if (primaryTrack_ && !primaryTrack_->timeline().isEmpty() && next < primaryTrack_->timeline().clipCount()) {
-                uint32_t gen = beginTimelineTransition();
-                switchToClip(next, primaryTrack_->timeline().clipAt(next).trimIn, env);
-                syncController.reset();
-                eof = false;
-                endTimelineTransition(gen);
-                LOGI("PlaybackSession: clip EOF -> switch to clip %d", next);
-                continue;
-            }
-
-            uint32_t transitionGeneration = beginTimelineTransition();
-            if (primaryTrack_ && !primaryTrack_->timeline().isEmpty() && primaryTrack_->timeline().clipCount() > 1) {
-                switchToClip(0, primaryTrack_->timeline().clipAt(0).trimIn, env);
-            } else {
-                int64_t startPos = (primaryTrack_ && !primaryTrack_->timeline().isEmpty())
-                    ? primaryTrack_->timeline().clipAt(0).trimIn : 0;
-                if (audioPipeline_) audioPipeline_->notifySeek(startPos);
-                if (primaryTrack_) {
-                    primaryTrack_->seekInCurrentClip(startPos);
-                }
-                if (audioPipeline_ && audioPipeline_->hasAudio()) audioPipeline_->flush();
-            }
-            if (hasOverlay_ && overlayTrack_ && !overlayTrack_->timeline().isEmpty()) {
-                const Clip& oFirst = overlayTrack_->timeline().clipAt(0);
-                if (overlayTrack_->activeClipIndex() != 0) {
-                    overlayTrack_->switchToClip(0, oFirst.trimIn, env);
-                } else {
-                    overlayTrack_->seekInCurrentClip(oFirst.trimIn);
-                }
-                if (overlayTrack_->sourceNode()) {
-                    overlayTrack_->sourceNode()->setActive(false);
-                }
-            }
-            currentPositionUs_.store(0);
-            syncController.reset();
-            eof = false;
-            endTimelineTransition(transitionGeneration);
-            LOGI("PlaybackSession: restart from beginning");
-            continue;
-        }
-
-        AVRational tb = primaryTrack_->videoTimeBase();
-        double fps = primaryTrack_->fps();
-        int64_t nominalDurationUs = (fps > 0) ? (int64_t)(1000000.0 / fps) : 33333;
-        int64_t perfCycleStartUs = steadyNowUs();
-        int64_t feedStartUs = perfCycleStartUs;
-
-        primaryTrack_->pumpAvailablePackets();
-        eof = primaryTrack_->isEof();
-        int64_t feedEndUs = steadyNowUs();
-
-        int64_t dequeueStartUs = feedEndUs;
-        HwDecoder::DecodedFrame decodedFrame;
-        bool gotFrame = primaryTrack_->dequeueFrame(decodedFrame, 30000);
-        int64_t dequeueEndUs = steadyNowUs();
-        if (!gotFrame) continue;
-
-        int64_t framePtsUs = av_rescale_q(decodedFrame.pts, tb, {1, 1000000});
-
-        if (primaryTrack_->isFrameBeforeTrim(framePtsUs)) {
-            primaryTrack_->releaseFrame(decodedFrame.bufferIndex, false);
-            continue;
-        }
-        if (primaryTrack_->isFrameAfterTrim(framePtsUs)) {
-            primaryTrack_->releaseFrame(decodedFrame.bufferIndex, false);
-            int next = primaryTrack_->activeClipIndex() + 1;
-            if (next < primaryTrack_->timeline().clipCount()) {
-                uint32_t gen = beginTimelineTransition();
-                switchToClip(next, primaryTrack_->timeline().clipAt(next).trimIn, env);
-                syncController.reset();
-                eof = false;
-                endTimelineTransition(gen);
-                continue;
-            } else {
-                eof = true;
-                continue;
-            }
-        }
-
-        primaryTrack_->releaseFrame(decodedFrame.bufferIndex, true);
-
-        int64_t waitStartUs = dequeueEndUs;
-        primaryTrack_->consumeRenderedFrame(env, 50);
-        int64_t waitEndUs = steadyNowUs();
-        int64_t updateStartUs = waitEndUs;
-        int64_t updateEndUs = steadyNowUs();
-
-        int64_t globalPosUs = primaryTrack_->mapSourcePtsToTimelineUs(framePtsUs);
-        currentPositionUs_.store(globalPosUs);
-
-        if (hasOverlay_ && overlayTrack_ && overlayTrack_->sourceNode()) {
-            do {
-                ClipLookup oLookup = overlayTrack_->timeline().resolve(globalPosUs);
-                if (oLookup.clipIndex < 0) {
-                    overlayTrack_->sourceNode()->setActive(false);
-                    break;
-                }
-
-                if (oLookup.clipIndex != overlayTrack_->activeClipIndex()) {
-                    if (!overlayTrack_->switchToClip(oLookup.clipIndex, oLookup.sourcePositionUs, env)) {
-                        overlayTrack_->sourceNode()->setActive(false);
-                        break;
-                    }
-                }
-
-                if (!overlayTrack_->isEof()) {
-                    for (int i = 0; i < 3; i++) {
-                        if (!overlayTrack_->pumpAvailablePackets()) {
-                            break;
-                        }
-                    }
-                }
-
-                HwDecoder::DecodedFrame oFrame;
-                if (overlayTrack_->dequeueFrame(oFrame, 5000)) {
-                    int64_t oPtsUs = av_rescale_q(oFrame.pts, overlayTrack_->videoTimeBase(), {1, 1000000});
-
-                    if (overlayTrack_->isFrameBeforeTrim(oPtsUs)) {
-                        overlayTrack_->releaseFrame(oFrame.bufferIndex, false);
-                    } else if (overlayTrack_->isFrameAfterTrim(oPtsUs)) {
-                        overlayTrack_->releaseFrame(oFrame.bufferIndex, false);
-                        int oNext = overlayTrack_->activeClipIndex() + 1;
-                        if (oNext >= overlayTrack_->timeline().clipCount()) {
-                            overlayTrack_->sourceNode()->setActive(false);
-                        }
-                    } else {
-                        overlayTrack_->releaseFrame(oFrame.bufferIndex, true);
-                        overlayTrack_->consumeRenderedFrame(env, 30);
-                        overlayTrack_->sourceNode()->setActive(true);
-                    }
-                }
-            } while (false);
-        }
-
-        int64_t audioClockUs = getAudioClockUs();
-        int64_t wallNowUs = steadyNowUs();
-        VideoSyncDecision syncDecision = syncController.prepareFrame(
-            framePtsUs,
-            nominalDurationUs,
-            audioClockUs,
-            wallNowUs);
-
-        if (syncDecision.timelineReset) {
-            LOGI("AVSYNC video-timeline-reset framePtsUs=%lld audioClockUs=%lld frameTimerUs=%lld wallNowUs=%lld",
-                 (long long)framePtsUs,
-                 (long long)(audioClockUs >= 0 ? audioClockUs : -1),
-                 (long long)syncDecision.frameTimerUs,
-                 (long long)wallNowUs);
-        }
-
-        if (syncDecision.sleepUs > 0) {
-            usleep((useconds_t)syncDecision.sleepUs);
-        }
-
-        VideoSyncDecision finalizedDecision;
-        syncController.finalizeFrame(syncDecision, audioClockUs, steadyNowUs(), finalizedDecision);
-        bool shouldRender = finalizedDecision.shouldRender;
-
-        int64_t diagNowUs = steadyNowUs();
-        if (diagNowUs - lastVideoDiagLogUs >= kAvSyncDiagIntervalUs) {
-            lastVideoDiagLogUs = diagNowUs;
-            LOGI("AVSYNC video-diag framePtsUs=%lld audioClockUs=%lld diffUs=%lld delayUs=%lld frameDurUs=%lld render=%d drops=%d posUs=%lld",
-                 (long long)framePtsUs,
-                 (long long)audioClockUs,
-                 (long long)finalizedDecision.diffUs,
-                 (long long)finalizedDecision.delayUs,
-                 (long long)finalizedDecision.frameDurationUs,
-                 shouldRender ? 1 : 0,
-                 finalizedDecision.consecutiveDrops,
-                 (long long)currentPositionUs_.load());
-        }
-
-        int64_t executeStartUs = steadyNowUs();
-        if (shouldRender) {
-            if (auto* blendNode = renderGraphBuilder_ ? renderGraphBuilder_->blendNode() : nullptr) {
-                blendNode->overlayAlpha = overlayAlpha_.load();
-            }
-            if (auto* outputNode = renderGraphBuilder_ ? renderGraphBuilder_->outputNode() : nullptr) {
-                outputNode->outputWidth = surfaceWidth;
-                outputNode->outputHeight = surfaceHeight;
-                outputNode->execute(framePtsUs);
-            }
-        }
-        int64_t executeEndUs = steadyNowUs();
-
-        int64_t swapStartUs = executeEndUs;
-        if (shouldRender) {
-            eglCore_.swapBuffers(eglSurface_);
-        }
-        int64_t swapEndUs = steadyNowUs();
-
-        if (diagNowUs - lastPerfDiagLogUs >= kAvSyncDiagIntervalUs) {
-            lastPerfDiagLogUs = diagNowUs;
-            LOGI("AVPERF framePtsUs=%lld audioClockUs=%lld diffUs=%lld feedUs=%lld dequeueUs=%lld waitUs=%lld updateUs=%lld executeUs=%lld swapUs=%lld totalUs=%lld render=%d",
-                 (long long)framePtsUs,
-                 (long long)audioClockUs,
-                 (long long)(audioClockUs >= 0 ? (framePtsUs - audioClockUs) : 0),
-                 (long long)(feedEndUs - feedStartUs),
-                 (long long)(dequeueEndUs - dequeueStartUs),
-                 (long long)(waitEndUs - waitStartUs),
-                 (long long)(updateEndUs - updateStartUs),
-                 (long long)(executeEndUs - executeStartUs),
-                 (long long)(swapEndUs - swapStartUs),
-                 (long long)(swapEndUs - perfCycleStartUs),
-                 shouldRender ? 1 : 0);
-        }
-
-        if (eof) {
-            int next = primaryTrack_->activeClipIndex() + 1;
-            if (!primaryTrack_ || primaryTrack_->timeline().isEmpty() || next >= primaryTrack_->timeline().clipCount()) {
-                playing_.store(false);
-                if (audioPipeline_ && audioPipeline_->hasAudio()) audioPipeline_->pause();
-                LOGI("PlaybackSession: playback completed (EOF)");
-                if (playbackCompletedHandler_) {
-                    playbackCompletedHandler_();
-                }
-            } else {
-                LOGI("PlaybackSession: clip %d EOF, next clip %d pending", primaryTrack_->activeClipIndex(), next);
-            }
-        }
-    }
-
-    releaseDecodePipeline(env);
+void PlaybackSession::teardownRenderThread(RenderLoopContext& ctx) {
+    releaseDecodePipeline(ctx.env);
 
     if (eglSurface_ != EGL_NO_SURFACE) {
         eglCore_.makeNothingCurrent();
@@ -821,9 +379,554 @@ void PlaybackSession::renderThreadFunc() {
 
     {
         std::lock_guard<std::mutex> lock(windowMutex_);
-        if (window_) { ANativeWindow_release(window_); window_ = nullptr; }
+        if (window_) {
+            ANativeWindow_release(window_);
+            window_ = nullptr;
+        }
     }
 
-    jvm_->DetachCurrentThread();
+    if (ctx.env) {
+        jvm_->DetachCurrentThread();
+        ctx.env = nullptr;
+    }
     LOGI("PlaybackSession: render thread stopped");
+}
+
+bool PlaybackSession::handleSurfaceLifecycle(RenderLoopContext& ctx) {
+    if (!windowChanged_.load()) {
+        return false;
+    }
+
+    windowChanged_.store(false);
+
+    if (eglSurface_ != EGL_NO_SURFACE) {
+        eglCore_.makeNothingCurrent();
+        eglCore_.destroySurface(eglSurface_);
+        eglSurface_ = EGL_NO_SURFACE;
+    }
+
+    std::lock_guard<std::mutex> lock(windowMutex_);
+    if (window_) {
+        eglSurface_ = eglCore_.createWindowSurface(window_);
+        if (eglSurface_ != EGL_NO_SURFACE) {
+            eglCore_.makeCurrent(eglSurface_);
+            ctx.surfaceWidth = ANativeWindow_getWidth(window_);
+            ctx.surfaceHeight = ANativeWindow_getHeight(window_);
+            glViewport(0, 0, ctx.surfaceWidth, ctx.surfaceHeight);
+            LOGI("PlaybackSession: EGL surface %dx%d", ctx.surfaceWidth, ctx.surfaceHeight);
+        }
+    }
+
+    return true;
+}
+
+bool PlaybackSession::handleSourceLifecycle(RenderLoopContext& ctx) {
+    if (!videoSourceChanged_.load() || eglSurface_ == EGL_NO_SURFACE) {
+        return false;
+    }
+
+    uint32_t transitionGeneration = timelineGeneration_.load();
+    videoSourceChanged_.store(false);
+    if (initDecodePipeline(ctx.env)) {
+        buildRenderTree(ctx.surfaceWidth, ctx.surfaceHeight);
+        ctx.syncController.reset();
+        ctx.eof = false;
+        LOGI("PlaybackSession: ready, fps=%.1f, overlay=%s",
+             primaryTrack_->fps(),
+             (hasOverlay_ && overlayTrack_ && overlayTrack_->sourceNode()) ? "yes" : "no");
+        LOGI("AVSYNC transition source-ready generation=%u audio=%d",
+             transitionGeneration,
+             (audioPipeline_ && audioPipeline_->hasAudio()) ? 1 : 0);
+    }
+    endTimelineTransition(transitionGeneration);
+    return true;
+}
+
+bool PlaybackSession::handlePendingFastSeek(RenderLoopContext& ctx) {
+    int64_t fastTarget = seekFastTargetUs_.exchange(-1);
+    if (fastTarget < 0 || !pipelineInitialized_) {
+        return false;
+    }
+
+    uint32_t transitionGeneration = timelineGeneration_.load();
+    executeSeekToTimelinePosition(ctx, fastTarget, SeekMode::FastPreview);
+    if (seekFastTargetUs_.load() >= 0) {
+        return true;
+    }
+    endTimelineTransition(transitionGeneration);
+    return true;
+}
+
+bool PlaybackSession::handlePendingExactSeek(RenderLoopContext& ctx) {
+    int64_t seekTarget = seekTargetUs_.exchange(-1);
+    if (seekTarget < 0 || !pipelineInitialized_) {
+        return false;
+    }
+
+    uint32_t transitionGeneration = timelineGeneration_.load();
+    executeSeekToTimelinePosition(ctx, seekTarget, SeekMode::ExactFrame);
+    endTimelineTransition(transitionGeneration);
+    return true;
+}
+
+bool PlaybackSession::handleIdleState(RenderLoopContext& ctx) {
+    if (playing_.load() && eglSurface_ != EGL_NO_SURFACE && pipelineInitialized_) {
+        return false;
+    }
+
+    ctx.syncController.reset();
+    std::unique_lock<std::mutex> lock(cmdMutex_);
+    cmdCond_.wait_for(lock, std::chrono::milliseconds(50));
+    return true;
+}
+
+bool PlaybackSession::handleTimelineEof(RenderLoopContext& ctx) {
+    if (!ctx.eof) {
+        return false;
+    }
+
+    int next = primaryTrack_->activeClipIndex() + 1;
+    if (primaryTrack_ && !primaryTrack_->timeline().isEmpty() &&
+        next < primaryTrack_->timeline().clipCount()) {
+        uint32_t gen = beginTimelineTransition();
+        switchToClip(next, primaryTrack_->timeline().clipAt(next).trimIn, ctx.env);
+        ctx.syncController.reset();
+        ctx.eof = false;
+        endTimelineTransition(gen);
+        LOGI("PlaybackSession: clip EOF -> switch to clip %d", next);
+        return true;
+    }
+
+    return restartTimeline(ctx);
+}
+
+bool PlaybackSession::restartTimeline(RenderLoopContext& ctx) {
+    uint32_t transitionGeneration = beginTimelineTransition();
+    if (primaryTrack_ && !primaryTrack_->timeline().isEmpty() &&
+        primaryTrack_->timeline().clipCount() > 1) {
+        switchToClip(0, primaryTrack_->timeline().clipAt(0).trimIn, ctx.env);
+    } else {
+        int64_t startPos = (primaryTrack_ && !primaryTrack_->timeline().isEmpty())
+            ? primaryTrack_->timeline().clipAt(0).trimIn
+            : 0;
+        if (audioPipeline_) audioPipeline_->notifySeek(startPos);
+        if (primaryTrack_) {
+            primaryTrack_->seekInCurrentClip(startPos);
+        }
+        if (audioPipeline_ && audioPipeline_->hasAudio()) audioPipeline_->flush();
+    }
+
+    if (hasOverlay_ && overlayTrack_ && !overlayTrack_->timeline().isEmpty()) {
+        const Clip& oFirst = overlayTrack_->timeline().clipAt(0);
+        if (overlayTrack_->activeClipIndex() != 0) {
+            overlayTrack_->switchToClip(0, oFirst.trimIn, ctx.env);
+        } else {
+            overlayTrack_->seekInCurrentClip(oFirst.trimIn);
+        }
+        if (overlayTrack_->sourceNode()) {
+            overlayTrack_->sourceNode()->setActive(false);
+        }
+    }
+
+    currentPositionUs_.store(0);
+    ctx.syncController.reset();
+    ctx.eof = false;
+    endTimelineTransition(transitionGeneration);
+    LOGI("PlaybackSession: restart from beginning");
+    return true;
+}
+
+void PlaybackSession::processPlaybackTick(RenderLoopContext& ctx) {
+    FrameTickContext frameCtx;
+    FramePerfCounters perf;
+    if (!feedAndDecodePrimaryFrame(ctx, frameCtx, perf)) {
+        return;
+    }
+
+    updateOverlayForPlayback(ctx, frameCtx.globalPosUs);
+    VideoSyncDecision decision = syncAndPresent(ctx, frameCtx, perf);
+    emitDiagnostics(ctx, frameCtx, perf, decision);
+
+    if (!ctx.eof) {
+        return;
+    }
+
+    int next = primaryTrack_->activeClipIndex() + 1;
+    if (!primaryTrack_ || primaryTrack_->timeline().isEmpty() ||
+        next >= primaryTrack_->timeline().clipCount()) {
+        playing_.store(false);
+        if (audioPipeline_ && audioPipeline_->hasAudio()) audioPipeline_->pause();
+        LOGI("PlaybackSession: playback completed (EOF)");
+        if (playbackCompletedHandler_) {
+            playbackCompletedHandler_();
+        }
+    } else {
+        LOGI("PlaybackSession: clip %d EOF, next clip %d pending",
+             primaryTrack_->activeClipIndex(), next);
+    }
+}
+
+bool PlaybackSession::feedAndDecodePrimaryFrame(RenderLoopContext& ctx,
+                                                FrameTickContext& frameCtx,
+                                                FramePerfCounters& perf) {
+    AVRational tb = primaryTrack_->videoTimeBase();
+    double fps = primaryTrack_->fps();
+    frameCtx.nominalDurationUs = (fps > 0) ? static_cast<int64_t>(1000000.0 / fps) : 33333;
+
+    perf.perfCycleStartUs = steadyNowUs();
+    perf.feedStartUs = perf.perfCycleStartUs;
+    primaryTrack_->pumpAvailablePackets();
+    ctx.eof = primaryTrack_->isEof();
+    perf.feedEndUs = steadyNowUs();
+
+    perf.dequeueStartUs = perf.feedEndUs;
+    if (!primaryTrack_->dequeueFrame(frameCtx.decodedFrame, 30000)) {
+        perf.dequeueEndUs = steadyNowUs();
+        return false;
+    }
+    perf.dequeueEndUs = steadyNowUs();
+
+    frameCtx.framePtsUs = av_rescale_q(frameCtx.decodedFrame.pts, tb, {1, 1000000});
+    if (primaryTrack_->isFrameBeforeTrim(frameCtx.framePtsUs)) {
+        primaryTrack_->releaseFrame(frameCtx.decodedFrame.bufferIndex, false);
+        return false;
+    }
+
+    if (primaryTrack_->isFrameAfterTrim(frameCtx.framePtsUs)) {
+        primaryTrack_->releaseFrame(frameCtx.decodedFrame.bufferIndex, false);
+        int next = primaryTrack_->activeClipIndex() + 1;
+        if (next < primaryTrack_->timeline().clipCount()) {
+            uint32_t gen = beginTimelineTransition();
+            switchToClip(next, primaryTrack_->timeline().clipAt(next).trimIn, ctx.env);
+            ctx.syncController.reset();
+            ctx.eof = false;
+            endTimelineTransition(gen);
+        } else {
+            ctx.eof = true;
+        }
+        return false;
+    }
+
+    primaryTrack_->releaseFrame(frameCtx.decodedFrame.bufferIndex, true);
+    perf.waitStartUs = perf.dequeueEndUs;
+    primaryTrack_->consumeRenderedFrame(ctx.env, 50);
+    perf.waitEndUs = steadyNowUs();
+
+    perf.updateStartUs = perf.waitEndUs;
+    frameCtx.globalPosUs = primaryTrack_->mapSourcePtsToTimelineUs(frameCtx.framePtsUs);
+    currentPositionUs_.store(frameCtx.globalPosUs);
+    perf.updateEndUs = steadyNowUs();
+    return true;
+}
+
+void PlaybackSession::updateOverlayForPlayback(RenderLoopContext& ctx, int64_t timelineUs) {
+    if (!hasOverlay_ || !overlayTrack_ || !overlayTrack_->sourceNode()) {
+        return;
+    }
+
+    do {
+        ClipLookup oLookup = overlayTrack_->timeline().resolve(timelineUs);
+        if (oLookup.clipIndex < 0) {
+            overlayTrack_->sourceNode()->setActive(false);
+            break;
+        }
+
+        if (oLookup.clipIndex != overlayTrack_->activeClipIndex()) {
+            if (!overlayTrack_->switchToClip(oLookup.clipIndex, oLookup.sourcePositionUs, ctx.env)) {
+                overlayTrack_->sourceNode()->setActive(false);
+                break;
+            }
+        }
+
+        if (!overlayTrack_->isEof()) {
+            for (int i = 0; i < 3; i++) {
+                if (!overlayTrack_->pumpAvailablePackets()) {
+                    break;
+                }
+            }
+        }
+
+        HwDecoder::DecodedFrame oFrame;
+        if (overlayTrack_->dequeueFrame(oFrame, 5000)) {
+            int64_t oPtsUs = av_rescale_q(oFrame.pts, overlayTrack_->videoTimeBase(), {1, 1000000});
+
+            if (overlayTrack_->isFrameBeforeTrim(oPtsUs)) {
+                overlayTrack_->releaseFrame(oFrame.bufferIndex, false);
+            } else if (overlayTrack_->isFrameAfterTrim(oPtsUs)) {
+                overlayTrack_->releaseFrame(oFrame.bufferIndex, false);
+                int oNext = overlayTrack_->activeClipIndex() + 1;
+                if (oNext >= overlayTrack_->timeline().clipCount()) {
+                    overlayTrack_->sourceNode()->setActive(false);
+                }
+            } else {
+                overlayTrack_->releaseFrame(oFrame.bufferIndex, true);
+                overlayTrack_->consumeRenderedFrame(ctx.env, 30);
+                overlayTrack_->sourceNode()->setActive(true);
+            }
+        }
+    } while (false);
+}
+
+VideoSyncDecision PlaybackSession::syncAndPresent(RenderLoopContext& ctx,
+                                                  FrameTickContext& frameCtx,
+                                                  FramePerfCounters& perf) {
+    frameCtx.audioClockUs = getAudioClockUs();
+    int64_t wallNowUs = steadyNowUs();
+    VideoSyncDecision preparedDecision = ctx.syncController.prepareFrame(
+        frameCtx.framePtsUs,
+        frameCtx.nominalDurationUs,
+        frameCtx.audioClockUs,
+        wallNowUs);
+
+    if (preparedDecision.timelineReset) {
+        LOGI("AVSYNC video-timeline-reset framePtsUs=%lld audioClockUs=%lld frameTimerUs=%lld wallNowUs=%lld",
+             (long long)frameCtx.framePtsUs,
+             (long long)(frameCtx.audioClockUs >= 0 ? frameCtx.audioClockUs : -1),
+             (long long)preparedDecision.frameTimerUs,
+             (long long)wallNowUs);
+    }
+
+    if (preparedDecision.sleepUs > 0) {
+        usleep((useconds_t)preparedDecision.sleepUs);
+    }
+
+    VideoSyncDecision finalizedDecision;
+    ctx.syncController.finalizeFrame(
+        preparedDecision,
+        frameCtx.audioClockUs,
+        steadyNowUs(),
+        finalizedDecision);
+
+    perf.executeStartUs = steadyNowUs();
+    if (finalizedDecision.shouldRender) {
+        if (auto* blendNode = renderGraphBuilder_ ? renderGraphBuilder_->blendNode() : nullptr) {
+            blendNode->overlayAlpha = overlayAlpha_.load();
+        }
+        if (auto* outputNode = renderGraphBuilder_ ? renderGraphBuilder_->outputNode() : nullptr) {
+            outputNode->outputWidth = ctx.surfaceWidth;
+            outputNode->outputHeight = ctx.surfaceHeight;
+            outputNode->execute(frameCtx.framePtsUs);
+        }
+    }
+    perf.executeEndUs = steadyNowUs();
+
+    perf.swapStartUs = perf.executeEndUs;
+    if (finalizedDecision.shouldRender) {
+        eglCore_.swapBuffers(eglSurface_);
+    }
+    perf.swapEndUs = steadyNowUs();
+    return finalizedDecision;
+}
+
+void PlaybackSession::emitDiagnostics(RenderLoopContext& ctx,
+                                      const FrameTickContext& frameCtx,
+                                      const FramePerfCounters& perf,
+                                      const VideoSyncDecision& decision) {
+    int64_t diagNowUs = steadyNowUs();
+    if (diagNowUs - ctx.lastVideoDiagLogUs >= kAvSyncDiagIntervalUs) {
+        ctx.lastVideoDiagLogUs = diagNowUs;
+        LOGI("AVSYNC video-diag framePtsUs=%lld audioClockUs=%lld diffUs=%lld delayUs=%lld frameDurUs=%lld render=%d drops=%d posUs=%lld",
+             (long long)frameCtx.framePtsUs,
+             (long long)frameCtx.audioClockUs,
+             (long long)decision.diffUs,
+             (long long)decision.delayUs,
+             (long long)decision.frameDurationUs,
+             decision.shouldRender ? 1 : 0,
+             decision.consecutiveDrops,
+             (long long)currentPositionUs_.load());
+    }
+
+    if (diagNowUs - ctx.lastPerfDiagLogUs >= kAvSyncDiagIntervalUs) {
+        ctx.lastPerfDiagLogUs = diagNowUs;
+        LOGI("AVPERF framePtsUs=%lld audioClockUs=%lld diffUs=%lld feedUs=%lld dequeueUs=%lld waitUs=%lld updateUs=%lld executeUs=%lld swapUs=%lld totalUs=%lld render=%d",
+             (long long)frameCtx.framePtsUs,
+             (long long)frameCtx.audioClockUs,
+             (long long)(frameCtx.audioClockUs >= 0 ? (frameCtx.framePtsUs - frameCtx.audioClockUs) : 0),
+             (long long)(perf.feedEndUs - perf.feedStartUs),
+             (long long)(perf.dequeueEndUs - perf.dequeueStartUs),
+             (long long)(perf.waitEndUs - perf.waitStartUs),
+             (long long)(perf.updateEndUs - perf.updateStartUs),
+             (long long)(perf.executeEndUs - perf.executeStartUs),
+             (long long)(perf.swapEndUs - perf.swapStartUs),
+             (long long)(perf.swapEndUs - perf.perfCycleStartUs),
+             decision.shouldRender ? 1 : 0);
+    }
+}
+
+bool PlaybackSession::executeSeekToTimelinePosition(RenderLoopContext& ctx,
+                                                    int64_t targetUs,
+                                                    SeekMode mode) {
+    int64_t sourceTargetUs = targetUs;
+    if (!seekPrimaryTrackTo(ctx, targetUs, mode, sourceTargetUs)) {
+        return false;
+    }
+
+    ctx.syncController.reset();
+    ctx.eof = false;
+
+    FrameTickContext frameCtx;
+    int skipCount = 0;
+    bool gotFrame = acquireSeekFrame(ctx, sourceTargetUs, mode, frameCtx, skipCount);
+    if (gotFrame) {
+        updateOverlayForSeek(ctx, targetUs, mode);
+        presentSeekFrame(ctx, frameCtx, mode, targetUs);
+    } else if (mode == SeekMode::ExactFrame) {
+        currentPositionUs_.store(targetUs);
+    }
+
+    if (mode == SeekMode::FastPreview) {
+        LOGI("AVSYNC transition seekFast-ready generation=%u currentPosUs=%lld",
+             timelineGeneration_.load(),
+             (long long)currentPositionUs_.load());
+    } else {
+        LOGI("AVSYNC transition seek-ready generation=%u requestedUs=%lld sourceTargetUs=%lld skipCount=%d audioClockUs=%lld",
+             timelineGeneration_.load(),
+             (long long)targetUs,
+             (long long)sourceTargetUs,
+             skipCount,
+             (long long)getAudioClockUs());
+    }
+    return gotFrame;
+}
+
+bool PlaybackSession::seekPrimaryTrackTo(RenderLoopContext& ctx,
+                                         int64_t targetUs,
+                                         SeekMode mode,
+                                         int64_t& sourceTargetUs) {
+    (void)mode;
+    sourceTargetUs = targetUs;
+    if (!primaryTrack_) {
+        return false;
+    }
+
+    if (!primaryTrack_->timeline().isEmpty()) {
+        ClipLookup lookup = primaryTrack_->timeline().resolve(targetUs);
+        if (lookup.clipIndex < 0 && primaryTrack_->timeline().durationUs() > 0) {
+            lookup = primaryTrack_->timeline().resolve(primaryTrack_->timeline().durationUs() - 1);
+        }
+        if (lookup.clipIndex < 0) {
+            return false;
+        }
+        sourceTargetUs = lookup.sourcePositionUs;
+        if (lookup.clipIndex != primaryTrack_->activeClipIndex()) {
+            return switchToClip(lookup.clipIndex, lookup.sourcePositionUs, ctx.env);
+        }
+        return primaryTrack_->seekInCurrentClip(lookup.sourcePositionUs);
+    }
+
+    return primaryTrack_->seekInCurrentClip(sourceTargetUs);
+}
+
+bool PlaybackSession::acquireSeekFrame(RenderLoopContext& ctx,
+                                       int64_t sourceTargetUs,
+                                       SeekMode mode,
+                                       FrameTickContext& frameCtx,
+                                       int& skipCount) {
+    AVRational tb = primaryTrack_->videoTimeBase();
+
+    if (mode == SeekMode::FastPreview) {
+        for (int attempt = 0; attempt < 100 && running_.load(); attempt++) {
+            primaryTrack_->queueVideoPacketWithTimeout(50000);
+
+            if (primaryTrack_->dequeueFrame(frameCtx.decodedFrame, 5000)) {
+                frameCtx.framePtsUs = av_rescale_q(frameCtx.decodedFrame.pts, tb, {1, 1000000});
+                frameCtx.globalPosUs = primaryTrack_->mapSourcePtsToTimelineUs(frameCtx.framePtsUs);
+                primaryTrack_->releaseFrame(frameCtx.decodedFrame.bufferIndex, true);
+                primaryTrack_->consumeRenderedFrame(ctx.env, 50);
+                return true;
+            }
+        }
+        return false;
+    }
+
+    while (running_.load()) {
+        while (!ctx.eof) {
+            if (!primaryTrack_->queueVideoPacketWithTimeout(50000)) {
+                if (primaryTrack_->isEof()) {
+                    ctx.eof = true;
+                }
+                break;
+            }
+        }
+
+        if (!primaryTrack_->dequeueFrame(frameCtx.decodedFrame, 30000)) {
+            if (ctx.eof) {
+                break;
+            }
+            continue;
+        }
+
+        frameCtx.framePtsUs = av_rescale_q(frameCtx.decodedFrame.pts, tb, {1, 1000000});
+        frameCtx.globalPosUs = primaryTrack_->mapSourcePtsToTimelineUs(frameCtx.framePtsUs);
+        if (frameCtx.framePtsUs >= sourceTargetUs) {
+            primaryTrack_->releaseFrame(frameCtx.decodedFrame.bufferIndex, true);
+            primaryTrack_->consumeRenderedFrame(ctx.env, 50);
+            return true;
+        }
+
+        primaryTrack_->releaseFrame(frameCtx.decodedFrame.bufferIndex, true);
+        primaryTrack_->consumeRenderedFrame(ctx.env, 50);
+        skipCount++;
+    }
+
+    return false;
+}
+
+void PlaybackSession::presentSeekFrame(RenderLoopContext& ctx,
+                                       const FrameTickContext& frameCtx,
+                                       SeekMode mode,
+                                       int64_t requestedTimelineUs) {
+    if (auto* blendNode = renderGraphBuilder_ ? renderGraphBuilder_->blendNode() : nullptr) {
+        blendNode->overlayAlpha = overlayAlpha_.load();
+    }
+    if (auto* outputNode = renderGraphBuilder_ ? renderGraphBuilder_->outputNode() : nullptr) {
+        outputNode->outputWidth = ctx.surfaceWidth;
+        outputNode->outputHeight = ctx.surfaceHeight;
+        outputNode->execute(frameCtx.framePtsUs);
+    }
+    eglCore_.swapBuffers(eglSurface_);
+
+    if (mode == SeekMode::FastPreview) {
+        currentPositionUs_.store(frameCtx.globalPosUs);
+    } else {
+        currentPositionUs_.store(requestedTimelineUs);
+    }
+}
+
+void PlaybackSession::updateOverlayForSeek(RenderLoopContext& ctx,
+                                           int64_t targetUs,
+                                           SeekMode mode) {
+    (void)mode;
+    if (!hasOverlay_ || !overlayTrack_ || !overlayTrack_->sourceNode()) {
+        return;
+    }
+
+    ClipLookup oLookup = overlayTrack_->timeline().resolve(targetUs);
+    if (oLookup.clipIndex < 0) {
+        overlayTrack_->sourceNode()->setActive(false);
+        return;
+    }
+
+    bool overlayReady = (oLookup.clipIndex != overlayTrack_->activeClipIndex())
+        ? overlayTrack_->switchToClip(oLookup.clipIndex, oLookup.sourcePositionUs, ctx.env)
+        : overlayTrack_->seekInCurrentClip(oLookup.sourcePositionUs);
+    for (int oa = 0; overlayReady && oa < 50; oa++) {
+        overlayTrack_->queueVideoPacketWithTimeout(10000);
+        HwDecoder::DecodedFrame oFrame;
+        if (overlayTrack_->dequeueFrame(oFrame, 5000)) {
+            int64_t oPtsUs = av_rescale_q(oFrame.pts, overlayTrack_->videoTimeBase(), {1, 1000000});
+            if (overlayTrack_->isFrameBeforeTrim(oPtsUs)) {
+                overlayTrack_->releaseFrame(oFrame.bufferIndex, false);
+                continue;
+            }
+            if (overlayTrack_->isFrameAfterTrim(oPtsUs)) {
+                overlayTrack_->releaseFrame(oFrame.bufferIndex, false);
+                break;
+            }
+            overlayTrack_->releaseFrame(oFrame.bufferIndex, true);
+            overlayTrack_->consumeRenderedFrame(ctx.env, 50);
+            overlayTrack_->sourceNode()->setActive(true);
+            break;
+        }
+    }
 }
