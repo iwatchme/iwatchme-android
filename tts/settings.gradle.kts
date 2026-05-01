@@ -1,8 +1,12 @@
+val useAliyunMirror = !System.getenv("CI").toBoolean()
+
 pluginManagement {
     repositories {
-        maven(url = "https://maven.aliyun.com/repository/google")
-        maven(url = "https://maven.aliyun.com/repository/public")
-        maven(url = "https://maven.aliyun.com/repository/gradle-plugin")
+        if (useAliyunMirror) {
+            maven(url = "https://maven.aliyun.com/repository/google")
+            maven(url = "https://maven.aliyun.com/repository/public")
+            maven(url = "https://maven.aliyun.com/repository/gradle-plugin")
+        }
         google()
         mavenCentral()
         gradlePluginPortal()
@@ -11,8 +15,10 @@ pluginManagement {
 
 dependencyResolutionManagement {
     repositories {
-        maven(url = "https://maven.aliyun.com/repository/google")
-        maven(url = "https://maven.aliyun.com/repository/public")
+        if (useAliyunMirror) {
+            maven(url = "https://maven.aliyun.com/repository/google")
+            maven(url = "https://maven.aliyun.com/repository/public")
+        }
         google()
         mavenCentral()
     }
