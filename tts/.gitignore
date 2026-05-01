@@ -1,0 +1,13 @@
+.claude
+.gradle/
+build/
+*/build/
+local.properties
+*.iml
+.idea/
+.DS_Store
+*.aar
+*.apk
+*.jar
+!gradle/wrapper/gradle-wrapper.jar
+.kotlin

@@ -1,5 +1,4 @@
 pluginManagement {
-    includeBuild("build-logic")
     repositories {
         maven(url = "https://maven.aliyun.com/repository/google")
         maven(url = "https://maven.aliyun.com/repository/public")
@@ -10,24 +9,19 @@ pluginManagement {
     }
 }
 
-includeBuild("threadDetectPlugin")
-includeBuild("tts")
-
 dependencyResolutionManagement {
     repositories {
         maven(url = "https://maven.aliyun.com/repository/google")
         maven(url = "https://maven.aliyun.com/repository/public")
         google()
         mavenCentral()
-        maven(url = "https://jitpack.io")
+    }
+    versionCatalogs {
+        create("libs") {
+            from(files("../gradle/libs.versions.toml"))
+        }
     }
 }
-rootProject.name = "iwatchme-android"
-include(":app")
-include(":baselineprofile")
-include(":benchmark")
-include(":startupRuntime")
-include(":startupLab")
-include(":crashLib")
-include(":render-engine")
-include(":player")
+
+rootProject.name = "tts"
+include(":tts-core", ":tts-cloudflare", ":tts-testing")

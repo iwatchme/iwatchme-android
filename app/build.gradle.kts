@@ -1,7 +1,14 @@
+import java.util.Properties
+
 plugins {
     id("iwatchme.android.application.compose")
     alias(libs.plugins.baselineprofile)
     id("thread-detect")
+}
+
+val localProps = Properties().apply {
+    val file = rootProject.file("local.properties")
+    if (file.exists()) load(file.inputStream())
 }
 
 android {
@@ -16,6 +23,13 @@ android {
         ndk {
             abiFilters.add("arm64-v8a")
         }
+
+        buildConfigField("String", "CLOUDFLARE_ACCOUNT_ID", "\"${localProps.getProperty("CLOUDFLARE_ACCOUNT_ID", "")}\"")
+        buildConfigField("String", "CLOUDFLARE_API_TOKEN", "\"${localProps.getProperty("CLOUDFLARE_API_TOKEN", "")}\"")
+    }
+
+    buildFeatures {
+        buildConfig = true
     }
 
     buildTypes {
@@ -61,6 +75,8 @@ dependencies {
     implementation(project(":startupLab"))
     implementation(project(":render-engine"))
     implementation(project(":player"))
+    implementation("io.tts.sdk:tts-core:1.0.0")
+    implementation("io.tts.sdk:tts-cloudflare:1.0.0")
     baselineProfile(project(":baselineprofile"))
 
     testImplementation(libs.junit)

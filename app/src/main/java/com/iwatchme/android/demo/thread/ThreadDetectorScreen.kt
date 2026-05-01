@@ -124,7 +124,7 @@ fun ThreadDetectorScreen(modifier: Modifier = Modifier) {
             contentPadding = PaddingValues(12.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            items(filtered.reversed(), key = { it.id }) { event ->
+            items(filtered.reversed().distinctBy { it.id }, key = { it.id }) { event ->
                 EventCard(event)
             }
         }

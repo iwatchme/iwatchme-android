@@ -4,6 +4,7 @@ import com.iwatchme.android.demo.crash.CrashLibDemoScreen
 import com.iwatchme.android.demo.player.PlayerDemoScreen
 import com.iwatchme.android.demo.renderengine.RenderEngineDemoScreen
 import com.iwatchme.android.demo.thread.ThreadDetectorScreen
+import com.iwatchme.android.demo.tts.TtsDemoScreen
 import com.iwatchme.startuplab.ui.StartupInspectorScreen
 
 object DemoRegistry {
@@ -47,6 +48,14 @@ object DemoRegistry {
             description = "Video playback powered by FFmpeg + MediaCodec hardware decoding with OpenGL ES render tree.",
             content = {
                 RenderEngineDemoScreen()
+            },
+        ),
+        DemoEntry(
+            route = "demo/tts",
+            title = "TTS Demo",
+            description = "Cloudflare Aura-2 text-to-speech with 39 voices, text input, and MP3 playback.",
+            content = {
+                TtsDemoScreen()
             },
         ),
     )
