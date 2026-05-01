@@ -1,8 +1,6 @@
-val useAliyunMirror = !System.getenv("CI").toBoolean()
-
 pluginManagement {
     repositories {
-        if (useAliyunMirror) {
+        if (System.getenv("CI") == null) {
             maven(url = "https://maven.aliyun.com/repository/google")
             maven(url = "https://maven.aliyun.com/repository/public")
             maven(url = "https://maven.aliyun.com/repository/gradle-plugin")
@@ -15,7 +13,7 @@ pluginManagement {
 
 dependencyResolutionManagement {
     repositories {
-        if (useAliyunMirror) {
+        if (System.getenv("CI") == null) {
             maven(url = "https://maven.aliyun.com/repository/google")
             maven(url = "https://maven.aliyun.com/repository/public")
         }
