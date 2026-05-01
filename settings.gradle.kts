@@ -11,7 +11,7 @@ pluginManagement {
 }
 
 includeBuild("threadDetectPlugin")
-includeBuild("tts")
+includeBuild("ai-sdk")
 
 dependencyResolutionManagement {
     repositories {

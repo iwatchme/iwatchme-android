@@ -75,8 +75,9 @@ dependencies {
     implementation(project(":startupLab"))
     implementation(project(":render-engine"))
     implementation(project(":player"))
-    implementation("io.tts.sdk:tts-core:1.0.0")
-    implementation("io.tts.sdk:tts-cloudflare:1.0.0")
+    implementation("io.ai.sdk:ai-tts:1.0.0")
+    implementation("io.ai.sdk:ai-translation:1.0.0")
+    implementation("io.ai.sdk:ai-asr:1.0.0")
     baselineProfile(project(":baselineprofile"))
 
     testImplementation(libs.junit)

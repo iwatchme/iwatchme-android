@@ -36,10 +36,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import com.iwatchme.android.BuildConfig
-import io.tts.sdk.TtsEngine
-import io.tts.sdk.TtsItem
-import io.tts.sdk.TtsVoiceParams
-import io.tts.sdk.cloudflare.CloudflareTtsSdk
+import io.ai.sdk.tts.TtsEngine
+import io.ai.sdk.tts.TtsItem
+import io.ai.sdk.tts.TtsVoiceParams
+import io.ai.sdk.tts.cloudflare.CloudflareTtsSdk
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.isActive

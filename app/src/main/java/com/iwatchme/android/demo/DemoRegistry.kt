@@ -1,9 +1,11 @@
 package com.iwatchme.android.demo
 
+import com.iwatchme.android.demo.asr.AsrDemoScreen
 import com.iwatchme.android.demo.crash.CrashLibDemoScreen
 import com.iwatchme.android.demo.player.PlayerDemoScreen
 import com.iwatchme.android.demo.renderengine.RenderEngineDemoScreen
 import com.iwatchme.android.demo.thread.ThreadDetectorScreen
+import com.iwatchme.android.demo.translation.TranslationDemoScreen
 import com.iwatchme.android.demo.tts.TtsDemoScreen
 import com.iwatchme.startuplab.ui.StartupInspectorScreen
 
@@ -56,6 +58,22 @@ object DemoRegistry {
             description = "Cloudflare Aura-2 text-to-speech with 39 voices, text input, and MP3 playback.",
             content = {
                 TtsDemoScreen()
+            },
+        ),
+        DemoEntry(
+            route = "demo/translation",
+            title = "Translation Demo",
+            description = "Cloudflare M2M100 multilingual translation with 28 language pairs.",
+            content = {
+                TranslationDemoScreen()
+            },
+        ),
+        DemoEntry(
+            route = "demo/asr",
+            title = "ASR Demo",
+            description = "Cloudflare Whisper automatic speech recognition from audio files.",
+            content = {
+                AsrDemoScreen()
             },
         ),
     )

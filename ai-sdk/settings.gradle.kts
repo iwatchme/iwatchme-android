@@ -1,0 +1,31 @@
+pluginManagement {
+    repositories {
+        if (System.getenv("CI") == null) {
+            maven(url = "https://maven.aliyun.com/repository/google")
+            maven(url = "https://maven.aliyun.com/repository/public")
+            maven(url = "https://maven.aliyun.com/repository/gradle-plugin")
+        }
+        google()
+        mavenCentral()
+        gradlePluginPortal()
+    }
+}
+
+dependencyResolutionManagement {
+    repositories {
+        if (System.getenv("CI") == null) {
+            maven(url = "https://maven.aliyun.com/repository/google")
+            maven(url = "https://maven.aliyun.com/repository/public")
+        }
+        google()
+        mavenCentral()
+    }
+    versionCatalogs {
+        create("libs") {
+            from(files("../gradle/libs.versions.toml"))
+        }
+    }
+}
+
+rootProject.name = "ai-sdk"
+include(":ai-core", ":ai-tts", ":ai-translation", ":ai-asr", ":ai-testing")
