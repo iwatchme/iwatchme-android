@@ -5,6 +5,8 @@ import kotlinx.coroutines.Dispatchers
 
 actual val ioDispatcher: CoroutineDispatcher = Dispatchers.Default
 
+actual val platformFileSystem: okio.FileSystem = okio.FileSystem.SYSTEM
+
 actual fun platformMd5(input: String): String {
     return Md5.digest(input.encodeToByteArray())
         .joinToString("") { (it.toInt() and 0xFF).toString(16).padStart(2, '0') }

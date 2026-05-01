@@ -8,7 +8,7 @@ class TtsCache(
     private val cacheDirPath: String,
     private val maxSizeBytes: Long = 500L * 1024 * 1024,
     private val strategy: TtsCacheStrategy = LruCacheStrategy(),
-    private val fileSystem: FileSystem = FileSystem.SYSTEM,
+    private val fileSystem: FileSystem = platformFileSystem,
 ) {
     private val cacheDir get() = cacheDirPath.toPath()
 

@@ -2,6 +2,7 @@ package io.tts.sdk.core
 
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
+import okio.FileSystem
 import java.security.MessageDigest
 
 actual val ioDispatcher: CoroutineDispatcher = Dispatchers.IO
@@ -11,3 +12,5 @@ actual fun platformMd5(input: String): String {
     return digest.digest(input.toByteArray())
         .joinToString("") { "%02x".format(it) }
 }
+
+actual val platformFileSystem: FileSystem = FileSystem.SYSTEM

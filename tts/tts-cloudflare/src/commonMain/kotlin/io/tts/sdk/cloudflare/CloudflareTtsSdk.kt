@@ -9,7 +9,7 @@ import io.tts.sdk.core.ITtsSdk
 import io.tts.sdk.core.TtsSdkParams
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
-import okio.FileSystem
+import io.tts.sdk.core.platformFileSystem
 import okio.Path.Companion.toPath
 import okio.buffer
 
@@ -55,7 +55,7 @@ class CloudflareTtsSdk(
         val filePath = "${params.cacheDirPath}/cf_${params.text.hashCode()}.$ext"
         val path = filePath.toPath()
 
-        val sink = FileSystem.SYSTEM.sink(path).buffer()
+        val sink = platformFileSystem.sink(path).buffer()
         try {
             sink.write(audioBytes)
             sink.flush()
