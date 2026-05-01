@@ -14,12 +14,12 @@ let package = Package(
         .binaryTarget(
             name: "TtsCore",
             url: "https://github.com/iwatchme/iwatchme-android/releases/download/tts-v0.0.1/TtsCore.xcframework.zip",
-            checksum: "8a106afceec593e59c18a317cde284f64cc286041bdc77edd0e2c5ecf2261dab"
+            checksum: "4bc53b76170db55409fdc1413386d94a9a42a6a92286d9a044e91aa323c2437f"
         ),
         .binaryTarget(
             name: "TtsCloudflare",
             url: "https://github.com/iwatchme/iwatchme-android/releases/download/tts-v0.0.1/TtsCloudflare.xcframework.zip",
-            checksum: "79e846d769965e5f3cef54105aef845cef9898a4d34922201d85228cf6cdb20d"
+            checksum: "bf8cca17fc967bb24b00c102e5180532699b9fc44aeea9434b675f5bf421fd0c"
         ),
     ]
 )
