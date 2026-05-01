@@ -13,13 +13,13 @@ let package = Package(
     targets: [
         .binaryTarget(
             name: "TtsCore",
-            url: "https://github.com/iwatchme/iwatchme-android/releases/download/tts-v0.0.1/TtsCore.xcframework.zip",
-            checksum: "4bc53b76170db55409fdc1413386d94a9a42a6a92286d9a044e91aa323c2437f"
+            url: "https://github.com/iwatchme/iwatchme-android/releases/download/tts-v0.0.2/TtsCore.xcframework.zip",
+            checksum: "f4f007cc2a5ccb737bc575b533df5bff9b8511b78cb5df8901eaf80f237dcdc1"
         ),
         .binaryTarget(
             name: "TtsCloudflare",
-            url: "https://github.com/iwatchme/iwatchme-android/releases/download/tts-v0.0.1/TtsCloudflare.xcframework.zip",
-            checksum: "bf8cca17fc967bb24b00c102e5180532699b9fc44aeea9434b675f5bf421fd0c"
+            url: "https://github.com/iwatchme/iwatchme-android/releases/download/tts-v0.0.2/TtsCloudflare.xcframework.zip",
+            checksum: "7855dfa8c6d75bd43daf68c9b48becf9c995b7b63f9f85c050636f6e381d78cb"
         ),
     ]
 )
