@@ -5,7 +5,7 @@
     <color name="forest_700">#1D3124</color>
     <color name="clay_200">#E3B28F</color>
     <color name="clay_700">#A55E39</color>
-    <color name="splash_background">#1D3124</color>
+    <color name="splash_background">#F7F7F5</color>
     <color name="black">#FF000000</color>
     <color name="white">#FFFFFFFF</color>
 </resources>
