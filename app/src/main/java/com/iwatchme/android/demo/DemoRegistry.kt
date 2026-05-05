@@ -1,12 +1,14 @@
 package com.iwatchme.android.demo
 
 import com.iwatchme.android.demo.asr.AsrDemoScreen
+import com.iwatchme.android.demo.cocosshell.CocosShellDemoScreen
 import com.iwatchme.android.demo.crash.CrashLibDemoScreen
 import com.iwatchme.android.demo.player.PlayerDemoScreen
 import com.iwatchme.android.demo.renderengine.RenderEngineDemoScreen
 import com.iwatchme.android.demo.thread.ThreadDetectorScreen
 import com.iwatchme.android.demo.translation.TranslationDemoScreen
 import com.iwatchme.android.demo.tts.TtsDemoScreen
+import com.iwatchme.android.demo.voiceeval.VoiceEvalDemoScreen
 import com.iwatchme.startuplab.ui.StartupInspectorScreen
 
 object DemoRegistry {
@@ -74,6 +76,22 @@ object DemoRegistry {
             description = "Cloudflare Whisper automatic speech recognition from audio files.",
             content = {
                 AsrDemoScreen()
+            },
+        ),
+        DemoEntry(
+            route = "demo/voice-eval",
+            title = "Voice Evaluation",
+            description = "Speech-scoring pipeline: real AudioRecord + WAV encoder + 4KB stream slicer + mockable scorer/uploader, modeled on the original Tencent SOE production flow.",
+            content = {
+                VoiceEvalDemoScreen()
+            },
+        ),
+        DemoEntry(
+            route = "demo/cocos-shell",
+            title = "Cocos Bridge & Downloader",
+            description = "Faithful reproduction of the Jiliguala Cocos container: :cocos_game process + Messenger IPC + URL-keyed package cache + WebView-hosted JS↔Native bridge driving the voice-eval engine.",
+            content = {
+                CocosShellDemoScreen()
             },
         ),
     )

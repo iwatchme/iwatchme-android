@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+  <title>Cocos Reading Demo</title>
+  <style>
+    :root { color-scheme: dark; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Helvetica Neue", sans-serif;
+      background: #0e1116; color: #eee;
+      margin: 0; padding: 20px; min-height: 100vh; box-sizing: border-box;
+    }
+    h2 { margin: 0 0 8px; font-size: 18px; color: #9aa4b2; }
+    #ref {
+      font-size: 22px; line-height: 1.4; padding: 14px;
+      background: #1c222c; border-radius: 8px; margin: 0 0 16px;
+    }
+    .row { display: flex; gap: 8px; margin-bottom: 12px; }
+    button {
+      flex: 1; font-size: 17px; padding: 12px 16px;
+      border: 0; border-radius: 8px;
+      background: #3b82f6; color: #fff; font-weight: 600;
+    }
+    button.secondary { background: #374151; }
+    button:active { opacity: 0.7; }
+    #status {
+      font-size: 14px; color: #9aa4b2; margin-bottom: 16px;
+      padding: 10px; background: #1c222c; border-radius: 6px;
+    }
+    #score-card {
+      background: #1c222c; border-radius: 10px; padding: 16px; margin-top: 16px;
+      display: none;
+    }
+    #score-card.show { display: block; }
+    #score {
+      font-size: 56px; font-weight: 700; margin: 0 0 12px;
+      color: #22c55e;
+    }
+    #score.mid { color: #f59e0b; }
+    #score.low { color: #ef4444; }
+    #words { margin-top: 8px; line-height: 2; }
+    .word {
+      display: inline-block; padding: 4px 10px; margin: 2px;
+      border-radius: 4px; background: #2a313d; font-size: 14px;
+    }
+    .word.high { background: #14532d; }
+    .word.mid  { background: #78350f; }
+    .word.low  { background: #7f1d1d; }
+    .src-tag {
+      display: inline-block; font-size: 11px; color: #6b7280;
+      padding: 2px 6px; background: #111827; border-radius: 4px; margin-left: 8px;
+    }
+  </style>
+</head>
+<body>
+  <h2>Read aloud (JS-driven via Cocos-style bridge)</h2>
+  <p id="ref">Hello, how are you today?</p>
+
+  <div class="row">
+    <button id="start">Start Recording</button>
+    <button id="stop" class="secondary">Stop</button>
+  </div>
+  <div id="status">idle. tap Start.</div>
+
+  <div id="score-card">
+    <div id="score">0<span class="src-tag" id="src-tag">scorer</span></div>
+    <div id="words"></div>
+  </div>
+
+  <script src="bridge.js"></script>
+  <script src="main.js"></script>
+</body>
+</html>

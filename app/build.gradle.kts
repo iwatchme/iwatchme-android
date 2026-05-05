@@ -11,6 +11,14 @@ val localProps = Properties().apply {
     if (file.exists()) load(file.inputStream())
 }
 
+// Required because ~/.gradle/init.d/mirror.gradle injects an aliyun-only
+// repo set via `allprojects`, which shadows the JitPack entry in
+// settings.gradle.kts. Re-declare it here so the transitive TAndroidLame
+// pulled in by :voice-eval resolves at app-build time too.
+repositories {
+    maven(url = "https://jitpack.io")
+}
+
 android {
     ndkVersion = "27.2.12479018"
     namespace = "com.iwatchme.android"
@@ -75,6 +83,9 @@ dependencies {
     implementation(project(":startupLab"))
     implementation(project(":render-engine"))
     implementation(project(":player"))
+    implementation(project(":voice-eval"))
+    implementation(project(":cocos-shell"))
+    implementation(libs.permission)
     implementation("io.ai.sdk:ai-tts:1.0.0")
     implementation("io.ai.sdk:ai-translation:1.0.0")
     implementation("io.ai.sdk:ai-asr:1.0.0")

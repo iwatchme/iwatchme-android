@@ -35,6 +35,20 @@
             android:exported="true"
             android:label="RenderEngine Demo"
             android:theme="@style/Theme.IWatchMeAndroid" />
+
+        <!-- Cocos shell demo: game container Activity runs in :cocos_game,
+             talking to a Messenger Service in the main process. Mirrors the
+             original ggr `:ggr_game` process + GameMessageService split. -->
+        <service
+            android:name="com.iwatchme.cocosshell.service.GameMessageService"
+            android:exported="false" />
+        <activity
+            android:name=".demo.cocosshell.CocosGameActivity"
+            android:configChanges="orientation|screenSize|keyboardHidden"
+            android:exported="false"
+            android:label="Cocos Game"
+            android:process=":cocos_game"
+            android:theme="@style/Theme.IWatchMeAndroid" />
     </application>
 
 </manifest>
