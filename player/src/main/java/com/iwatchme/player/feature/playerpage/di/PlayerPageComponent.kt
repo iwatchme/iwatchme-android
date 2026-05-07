@@ -7,7 +7,6 @@ import com.iwatchme.player.core.player.PlayerViewBinder
 import com.iwatchme.player.feature.playerpage.page.BizComponentBridge
 import com.iwatchme.player.feature.playerpage.page.PageDetailRepository
 import com.iwatchme.player.feature.playerpage.page.PageScopeAnchor
-import com.iwatchme.player.feature.playerpage.page.PlayRequestRepository
 import com.iwatchme.player.feature.playerpage.page.PlayerUiStateRepository
 import dagger.BindsInstance
 import dagger.Subcomponent
@@ -36,8 +35,6 @@ interface PlayerPageComponent {
 
     fun playerUiStateRepository(): PlayerUiStateRepository
 
-    fun playRequestRepository(): PlayRequestRepository
-
     @Subcomponent.Factory
     interface Factory {
         fun create(
@@ -46,5 +43,5 @@ interface PlayerPageComponent {
     }
 }
 
-@dagger.Module(subcomponents = [PlayerBizComponent::class, CurrentMediaComponent::class])
+@dagger.Module(subcomponents = [PlayerBizComponent::class])
 object PageSubcomponentsModule

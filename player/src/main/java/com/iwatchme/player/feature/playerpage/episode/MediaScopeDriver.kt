@@ -1,8 +1,8 @@
-package com.iwatchme.player.feature.playerpage.page
+package com.iwatchme.player.feature.playerpage.episode
 
 import android.util.Log
-import com.iwatchme.player.core.di.PageCoroutineScope
-import com.iwatchme.player.core.di.PageScope
+import com.iwatchme.player.core.di.EpisodeCoroutineScope
+import com.iwatchme.player.core.di.EpisodeScope
 import com.iwatchme.player.feature.playerpage.di.CurrentMediaComponent
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.awaitCancellation
@@ -13,30 +13,29 @@ import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
-@PageScope
+@EpisodeScope
 class MediaScopeDriver @Inject constructor(
-    @PageCoroutineScope private val pageScope: CoroutineScope,
-    private val playRequestRepository: PlayRequestRepository,
+    @EpisodeCoroutineScope private val episodeScope: CoroutineScope,
+    private val mediaRequestRepository: MediaRequestRepository,
     private val mediaComponentFactory: CurrentMediaComponent.Factory,
 ) {
     init {
-        pageScope.launch {
-            playRequestRepository.playRequestFlow
+        episodeScope.launch {
+            mediaRequestRepository.requestFlow
                 .filterNotNull()
-                .distinctUntilChangedBy { it.id }
-                .collectLatest { item ->
-                    Log.d("Player", "[MediaScopeDriver] >>> MediaScope CREATING for item: id=${item.id}, title=${item.title}")
+                .distinctUntilChangedBy { it.item.id to it.seekMs }
+                .collectLatest { request ->
+                    Log.d("Player", "[MediaScopeDriver] >>> MediaScope CREATING for item=${request.item.title}")
                     coroutineScope {
                         val component = mediaComponentFactory.create(
                             scope = this,
-                            item = item,
                         )
                         component.anchor().start()
                         Log.d("Player", "[MediaScopeDriver] MediaScope started, awaiting cancellation...")
                         try {
                             awaitCancellation()
                         } finally {
-                            Log.d("Player", "[MediaScopeDriver] <<< MediaScope DESTROYED for item: id=${item.id}")
+                            Log.d("Player", "[MediaScopeDriver] <<< MediaScope DESTROYED for item=${request.item.title}")
                         }
                     }
                 }

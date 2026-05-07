@@ -4,12 +4,12 @@ import android.content.Context
 import android.view.ViewGroup
 import android.widget.TextView
 import com.iwatchme.player.core.ui.UIComponent
-import com.iwatchme.player.model.DetailData
+import com.iwatchme.player.model.VideoItem
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.collectLatest
 
-class DetailTitleUIComponent(
-    private val detailFlow: StateFlow<DetailData?>,
+class EpisodeTitleUIComponent(
+    private val episodeFlow: StateFlow<VideoItem?>,
 ) : UIComponent<UIComponent.ViewViewEntry<TextView>> {
 
     override fun createViewEntry(
@@ -21,12 +21,8 @@ class DetailTitleUIComponent(
                 ViewGroup.LayoutParams.MATCH_PARENT,
                 ViewGroup.LayoutParams.WRAP_CONTENT,
             )
-            setPadding(dp(context, 12), dp(context, 12), dp(context, 12), dp(context, 12))
-            setTextColor(0xFF333333.toInt())
-            textSize = 16f
-            setTypeface(typeface, android.graphics.Typeface.BOLD)
-            setBackgroundColor(0xFFFFFFFF.toInt())
-            text = "等待加载..."
+            setTextColor(0xFFFB7299.toInt())
+            textSize = 13f
         }
         return UIComponent.ViewViewEntry(textView)
     }
@@ -36,20 +32,8 @@ class DetailTitleUIComponent(
     }
 
     override suspend fun bindToView(viewEntry: UIComponent.ViewViewEntry<TextView>) {
-        detailFlow.collectLatest { detail ->
-            viewEntry.value.text = if (detail != null) {
-                "${detail.title}  （点击切合集）"
-            } else {
-                "等待加载..."
-            }
+        episodeFlow.collectLatest { item ->
+            viewEntry.value.text = if (item != null) "正在播放：${item.title}" else ""
         }
-    }
-
-    private fun dp(context: Context, value: Int): Int {
-        return android.util.TypedValue.applyDimension(
-            android.util.TypedValue.COMPLEX_UNIT_DIP,
-            value.toFloat(),
-            context.resources.displayMetrics,
-        ).toInt()
     }
 }

@@ -91,6 +91,7 @@ class VideoListItemUIComponent(
 
     private fun formatDuration(ms: Long?): String {
         if (ms == null) return ""
+        if (ms < 0) return "直播"
         val totalSeconds = ms / 1000
         val minutes = totalSeconds / 60
         val seconds = totalSeconds % 60

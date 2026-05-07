@@ -16,6 +16,7 @@ import com.iwatchme.player.databinding.FragmentPlayerPageBinding
 import com.iwatchme.player.feature.playerpage.di.PlayerBizComponent
 import com.iwatchme.player.feature.playerpage.di.PlayerPageComponent
 import com.iwatchme.player.feature.playerpage.uicomponent.DetailTitleUIComponent
+import com.iwatchme.player.feature.playerpage.uicomponent.EpisodeTitleUIComponent
 import com.iwatchme.player.feature.playerpage.uicomponent.PlayerErrorUIComponent
 import com.iwatchme.player.feature.playerpage.uicomponent.PlayerLoadingUIComponent
 import kotlinx.coroutines.Job
@@ -37,6 +38,7 @@ class PlayerPageFragment : Fragment() {
     private var loadingBindJob: Job? = null
     private var errorBindJob: Job? = null
     private var titleBindJob: Job? = null
+    private var episodeTitleBindJob: Job? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -69,11 +71,15 @@ class PlayerPageFragment : Fragment() {
             adapter = listAdapter
         }
 
-        // 标题 UIComponent — 复用布局中已有的 currentTitle
+        // 顶部合集标题（BizScope 数据），点击切合集
         val titleComponent = DetailTitleUIComponent(pageComponent.pageDetailRepository().detailFlow)
         val titleEntry = titleComponent.wrapExistingView(binding.currentTitle)
         titleBindJob = viewLifecycleOwner.lifecycleScope.launch {
             titleComponent.bindToView(titleEntry)
+        }
+        binding.currentTitle.setOnClickListener {
+            Log.d("Player", "[PlayerPageFragment] currentTitle clicked — cycling to next detail (BizScope rebuild)")
+            pageComponent.pageDetailRepository().cycleNextDetail()
         }
 
         // loading / error overlay（PageScope 级别）
@@ -114,6 +120,14 @@ class PlayerPageFragment : Fragment() {
         val service = bizComponent.bizRecyclerViewService()
         Log.d("Player", "[PlayerPageFragment] BizComponent available — ${service.components.size} components")
         listAdapter?.submitList(service.components)
+
+        // 当前播放集标题（EpisodeScope 等价数据，从 BizScope 的 SelectionRepository 读 selectedItemFlow）
+        episodeTitleBindJob?.cancel()
+        val episodeTitleComponent = EpisodeTitleUIComponent(bizComponent.selectionRepository().selectedItemFlow)
+        val episodeEntry = episodeTitleComponent.wrapExistingView(binding.episodeTitle)
+        episodeTitleBindJob = viewLifecycleOwner.lifecycleScope.launch {
+            episodeTitleComponent.bindToView(episodeEntry)
+        }
     }
 
     override fun onDestroyView() {
@@ -123,6 +137,7 @@ class PlayerPageFragment : Fragment() {
         loadingBindJob?.cancel()
         errorBindJob?.cancel()
         titleBindJob?.cancel()
+        episodeTitleBindJob?.cancel()
         listAdapter = null
         _binding = null
     }

@@ -30,7 +30,7 @@
 
     </FrameLayout>
 
-    <!-- 当前播放标题 -->
+    <!-- 当前合集标题（点击切换合集，触发 BizScope 整链重建） -->
     <TextView
         android:id="@+id/currentTitle"
         android:layout_width="0dp"
@@ -40,10 +40,30 @@
         android:textSize="16sp"
         android:textStyle="bold"
         android:background="#FFFFFF"
+        android:clickable="true"
+        android:focusable="true"
+        android:foreground="?attr/selectableItemBackground"
         android:text="等待加载..."
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toBottomOf="@id/playerContainer" />
+
+    <!-- 当前播放集（EpisodeScope 数据，反映正在播放的样片名） -->
+    <TextView
+        android:id="@+id/episodeTitle"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:paddingStart="12dp"
+        android:paddingEnd="12dp"
+        android:paddingTop="4dp"
+        android:paddingBottom="8dp"
+        android:textColor="#FB7299"
+        android:textSize="13sp"
+        android:background="#FFFFFF"
+        android:text=""
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/currentTitle" />
 
     <!-- 视频列表 -->
     <androidx.recyclerview.widget.RecyclerView
@@ -54,6 +74,6 @@
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@id/currentTitle" />
+        app:layout_constraintTop_toBottomOf="@id/episodeTitle" />
 
 </androidx.constraintlayout.widget.ConstraintLayout>

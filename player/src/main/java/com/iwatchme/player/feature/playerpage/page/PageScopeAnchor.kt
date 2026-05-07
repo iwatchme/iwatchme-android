@@ -8,10 +8,9 @@ import javax.inject.Inject
 class PageScopeAnchor @Inject constructor(
     private val pageDetailRepository: PageDetailRepository,
     private val bizScopeDriver: BizScopeDriver,
-    private val mediaScopeDriver: MediaScopeDriver,
 ) {
     fun start() {
-        Log.d("Player", "[PageScopeAnchor] start() — triggering detail load (BizScopeDriver + MediaScopeDriver active)")
+        Log.d("Player", "[PageScopeAnchor] start() — triggering detail load (BizScopeDriver active)")
         pageDetailRepository.load()
     }
 }

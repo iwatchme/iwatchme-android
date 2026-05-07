@@ -29,17 +29,13 @@ class PageDetailRepository @Inject constructor(
         }
     }
 
-    fun loadForItem(itemId: String) {
-        Log.d("Player", "[PageDetailRepository] loadForItem() triggered for itemId=$itemId")
+    fun cycleNextDetail() {
+        val current = _detailFlow.value
         scope.launch {
-            delay(300)
-            val detail = MockData.getDetailForItem(itemId)
-            if (detail != null) {
-                Log.d("Player", "[PageDetailRepository] New detail loaded: bvid=${detail.bvid}, title=${detail.title}, items=${detail.items.size}")
-                _detailFlow.value = detail
-            } else {
-                Log.w("Player", "[PageDetailRepository] No detail found for itemId=$itemId")
-            }
+            val next = if (current != null) MockData.nextDetailAfter(current) else MockData.initialDetail
+            Log.d("Player", "[PageDetailRepository] cycleNextDetail: ${current?.title ?: "null"} -> ${next.title}")
+            delay(200)
+            _detailFlow.value = next
         }
     }
 }

@@ -19,6 +19,7 @@ dependencies {
     ksp(libs.dagger.compiler)
 
     implementation(libs.media3.exoplayer)
+    implementation(libs.media3.exoplayer.hls)
     implementation(libs.media3.ui)
 
     implementation(libs.core.ktx)

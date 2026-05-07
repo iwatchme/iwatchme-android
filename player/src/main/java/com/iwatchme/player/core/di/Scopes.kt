@@ -12,4 +12,8 @@ annotation class BizScope
 
 @Scope
 @Retention(AnnotationRetention.RUNTIME)
+annotation class EpisodeScope
+
+@Scope
+@Retention(AnnotationRetention.RUNTIME)
 annotation class MediaScope

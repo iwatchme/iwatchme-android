@@ -12,4 +12,8 @@ annotation class BizCoroutineScope
 
 @Qualifier
 @Retention(AnnotationRetention.RUNTIME)
+annotation class EpisodeCoroutineScope
+
+@Qualifier
+@Retention(AnnotationRetention.RUNTIME)
 annotation class MediaCoroutineScope
