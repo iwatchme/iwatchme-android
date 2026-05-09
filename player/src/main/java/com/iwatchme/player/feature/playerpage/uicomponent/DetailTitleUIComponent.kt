@@ -3,6 +3,7 @@ package com.iwatchme.player.feature.playerpage.uicomponent
 import android.content.Context
 import android.view.ViewGroup
 import android.widget.TextView
+import androidx.core.view.isVisible
 import com.iwatchme.player.core.ui.UIComponent
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.StateFlow
@@ -24,6 +25,7 @@ class DetailTitleUIComponent(
     data class State(
         val text: String,
         val clickable: Boolean,
+        val visible: Boolean = true,
     )
 
     override fun createViewEntry(
@@ -56,6 +58,7 @@ class DetailTitleUIComponent(
                 viewModel.state.collectLatest { state ->
                     view.text = state.text
                     view.isClickable = state.clickable
+                    view.isVisible = state.visible
                 }
             }
         }

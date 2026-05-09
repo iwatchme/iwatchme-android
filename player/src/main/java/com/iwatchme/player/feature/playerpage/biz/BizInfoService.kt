@@ -10,7 +10,7 @@ import com.iwatchme.player.feature.playerpage.uicomponent.BizInfoUIComponent
  *
  * 两份实现通过 @Binds 在各自 biz subcomponent 的 module 里绑成 BizInfoService，于是
  * Fragment 在 PlayerBizFacade 上只看见 `bizInfoService(): BizInfoService`，业务差异
- * 完全收敛在 DI 图里。这就是 theseus 的"interface + DI 多实现"。
+ * 完全收敛在 DI 图里——"interface + DI 多实现"模式（CLAUDE.md §7.3）。
  */
 interface BizInfoService {
     val viewModel: BizInfoUIComponent.ViewModel

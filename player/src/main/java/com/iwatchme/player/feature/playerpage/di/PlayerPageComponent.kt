@@ -1,5 +1,6 @@
 package com.iwatchme.player.feature.playerpage.di
 
+import androidx.activity.ComponentActivity
 import com.iwatchme.player.core.di.PageCoroutineScope
 import com.iwatchme.player.core.di.PageScope
 import com.iwatchme.player.core.player.ExoPlayerHolder
@@ -10,6 +11,8 @@ import com.iwatchme.player.feature.playerpage.page.MediaScopeDriver
 import com.iwatchme.player.feature.playerpage.page.PageBootstrap
 import com.iwatchme.player.feature.playerpage.page.PlayerErrorService
 import com.iwatchme.player.feature.playerpage.page.PlayerLoadingService
+import com.iwatchme.player.feature.playerpage.page.ScreenStateRepository
+import com.iwatchme.player.feature.playerpage.page.ScreenStateService
 import dagger.BindsInstance
 import dagger.Subcomponent
 import kotlinx.coroutines.CoroutineScope
@@ -39,10 +42,15 @@ interface PlayerPageComponent {
 
     fun mediaScopeDriver(): MediaScopeDriver
 
+    fun screenStateRepository(): ScreenStateRepository
+
+    fun screenStateService(): ScreenStateService
+
     @Subcomponent.Factory
     interface Factory {
         fun create(
             @BindsInstance @PageCoroutineScope scope: CoroutineScope,
+            @BindsInstance activity: ComponentActivity,
         ): PlayerPageComponent
     }
 }

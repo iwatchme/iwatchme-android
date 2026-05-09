@@ -10,9 +10,8 @@ import dagger.Subcomponent
 import kotlinx.coroutines.CoroutineScope
 
 /**
- * UGC 业务 Subcomponent——对齐 theseus 的 UGCVideoComponent。
- * 与 [OGVBizComponent] 共用 `@BizScope`、共用 [BizScopeModule] / [BizSubcomponentsModule]
- * / [VideoListModuleParser] 等业务无关 module，差异由 [UGCBizModule] 注入。
+ * UGC 业务 Subcomponent。与 [OGVBizComponent] 共用 `@BizScope`、共用 [BizScopeModule] /
+ * [BizSubcomponentsModule] / [VideoListModuleParser] 等业务无关 module，差异由 [UGCBizModule] 注入。
  */
 @BizScope
 @Subcomponent(

@@ -9,8 +9,7 @@ import javax.inject.Inject
  * EpisodeScope 的 bootstrap：
  *  - [EpisodeMetaRepository] 加载本集元数据（章节、互动节点等占位演示）；
  *  - [EpisodeCompletedService] 订阅播放状态，COMPLETED 时跳下一集（连续播放）。
- *    放在 EpisodeScope 是为了切集时整层重建，避免跨集状态串味——这是对齐 theseus
- *    UGCEpisodeCompletedService 的做法。
+ *    放在 EpisodeScope 是为了切集时整层重建，避免跨集状态串味。
  */
 @EpisodeScope
 class EpisodeBootstrap @Inject constructor(

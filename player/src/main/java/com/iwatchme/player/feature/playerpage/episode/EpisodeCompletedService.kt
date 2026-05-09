@@ -13,7 +13,7 @@ import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 /**
- * 一集播完的处理——对齐 theseus 的 `UGCEpisodeCompletedService`。
+ * 一集播完的处理：监听 PageScope 的完播事件流，自动跳到列表中下一集。
  *
  * 跨 scope 注入：
  *  - [item]：本 EpisodeScope 的 VideoItem（@BindsInstance）；

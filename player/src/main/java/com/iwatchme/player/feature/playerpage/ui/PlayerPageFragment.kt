@@ -5,6 +5,7 @@ import android.util.Log
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import androidx.activity.ComponentActivity
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
@@ -18,6 +19,8 @@ import com.iwatchme.player.feature.playerpage.di.PlayerPageComponent
 import com.iwatchme.player.feature.playerpage.uicomponent.BizInfoUIComponent
 import com.iwatchme.player.feature.playerpage.uicomponent.DetailTitleUIComponent
 import com.iwatchme.player.feature.playerpage.uicomponent.EpisodeTitleUIComponent
+import com.iwatchme.player.feature.playerpage.uicomponent.FullscreenButtonUIComponent
+import com.iwatchme.player.feature.playerpage.uicomponent.PanelVisibilityUIComponent
 import com.iwatchme.player.feature.playerpage.uicomponent.PlayerErrorUIComponent
 import com.iwatchme.player.feature.playerpage.uicomponent.PlayerLoadingUIComponent
 import kotlinx.coroutines.Job
@@ -39,8 +42,10 @@ class PlayerPageFragment : Fragment() {
     private var loadingBindJob: Job? = null
     private var errorBindJob: Job? = null
     private var titleBindJob: Job? = null
+    private var fullscreenBtnBindJob: Job? = null
     private var episodeTitleBindJob: Job? = null
     private var bizInfoBindJob: Job? = null
+    private var listVisibilityBindJob: Job? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -49,7 +54,8 @@ class PlayerPageFragment : Fragment() {
         val appComponent = PlayerSdk.appComponent
         val scope = kotlinx.coroutines.MainScope()
         pageScope = scope
-        pageComponent = appComponent.playerPageComponentFactory().create(scope)
+        pageComponent = appComponent.playerPageComponentFactory()
+            .create(scope, requireActivity() as ComponentActivity)
     }
 
     override fun onCreateView(
@@ -73,7 +79,7 @@ class PlayerPageFragment : Fragment() {
             adapter = listAdapter
         }
 
-        // 顶部合集标题：UI Component 只看 Service 暴露的 ViewModel
+        // 顶部合集标题
         val titleComponent = DetailTitleUIComponent(pageComponent.detailTitleService().viewModel)
         val titleEntry = titleComponent.wrapExistingView(binding.currentTitle)
         titleBindJob = viewLifecycleOwner.lifecycleScope.launch {
@@ -96,6 +102,16 @@ class PlayerPageFragment : Fragment() {
             errorComponent.bindToView(errorEntry)
         }
 
+        // 全屏按钮 —— Fragment 完全不知道 ScreenStateRepository 存在，只 bind UIComponent
+        val fullscreenBtn = FullscreenButtonUIComponent(
+            pageComponent.screenStateService().fullscreenButtonViewModel,
+        )
+        val fullscreenEntry = fullscreenBtn.createViewEntry(requireContext())
+        binding.playerOverlayContainer.addView(fullscreenEntry.root)
+        fullscreenBtnBindJob = viewLifecycleOwner.lifecycleScope.launch {
+            fullscreenBtn.bindToView(fullscreenEntry)
+        }
+
         pageComponent.bootstrap().start()
 
         observeBizScope()
@@ -113,10 +129,6 @@ class PlayerPageFragment : Fragment() {
         }
     }
 
-    /**
-     * 这里参数类型只是 [PlayerBizFacade]——Fragment 不知道当前是 UGCBizComponent 还是 OGVBizComponent。
-     * 业务差异由 [PlayerBizFacade.bizInfoService] 后面 @Binds 出的不同实现承载。
-     */
     private fun bindBizUI(facade: PlayerBizFacade) {
         Log.d("Player", "[PlayerPageFragment] BizComponent available — ${facade.javaClass.simpleName}")
         listAdapter?.submitList(facade.bizRecyclerViewService().components)
@@ -128,12 +140,19 @@ class PlayerPageFragment : Fragment() {
             episodeTitleComponent.bindToView(episodeEntry)
         }
 
-        // 业务专属信息条：UGCBizComponent 给 UGCInfoService，OGVBizComponent 给 OGVSeasonService
         bizInfoBindJob?.cancel()
         val bizInfoComponent = BizInfoUIComponent(facade.bizInfoService().viewModel)
         val bizInfoEntry = bizInfoComponent.wrapExistingView(binding.bizInfo)
         bizInfoBindJob = viewLifecycleOwner.lifecycleScope.launch {
             bizInfoComponent.bindToView(bizInfoEntry)
+        }
+
+        // 列表面板可见性 —— 横屏时由 VideoListPanelService 驱动隐藏
+        listVisibilityBindJob?.cancel()
+        val panelVisComponent = PanelVisibilityUIComponent(facade.videoListPanelService().viewModel)
+        val panelVisEntry = panelVisComponent.wrapExistingView(binding.videoList)
+        listVisibilityBindJob = viewLifecycleOwner.lifecycleScope.launch {
+            panelVisComponent.bindToView(panelVisEntry)
         }
     }
 
@@ -144,8 +163,10 @@ class PlayerPageFragment : Fragment() {
         loadingBindJob?.cancel()
         errorBindJob?.cancel()
         titleBindJob?.cancel()
+        fullscreenBtnBindJob?.cancel()
         episodeTitleBindJob?.cancel()
         bizInfoBindJob?.cancel()
+        listVisibilityBindJob?.cancel()
         listAdapter = null
         _binding = null
     }

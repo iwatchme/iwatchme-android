@@ -1,7 +1,7 @@
 package com.iwatchme.player.model
 
 /**
- * 详情数据——对齐 theseus 的 sealed `ViewReplyPack`。每种业务带不同的业务专属字段，
+ * 详情数据——sealed interface，每种业务带不同的业务专属字段，
  * 由 [BizScopeDriver] 在 driveBusinessScope 时按 sealed 类型分发到不同的 BizScope subcomponent。
  */
 sealed interface DetailData {

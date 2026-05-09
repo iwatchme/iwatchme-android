@@ -10,7 +10,7 @@ import dagger.Subcomponent
 import kotlinx.coroutines.CoroutineScope
 
 /**
- * OGV 业务 Subcomponent——对齐 theseus 的 OgvSeasonComponent。
+ * OGV 业务 Subcomponent。与 [UGCBizComponent] 平行，差异由 [OGVBizModule] + [OGVSeasonBannerParser] 注入。
  */
 @BizScope
 @Subcomponent(

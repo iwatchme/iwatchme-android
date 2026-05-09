@@ -22,6 +22,7 @@ class BizBootstrap @Inject constructor(
     private val episodeScopeDriver: EpisodeScopeDriver,
     private val episodeTitleService: EpisodeTitleService,
     private val bizInfoService: BizInfoService,
+    @Suppress("unused") private val videoListPanelService: VideoListPanelService,
 ) {
     fun start() {
         Log.d(

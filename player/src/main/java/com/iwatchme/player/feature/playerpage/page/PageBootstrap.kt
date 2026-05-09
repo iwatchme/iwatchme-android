@@ -14,6 +14,7 @@ import javax.inject.Inject
 class PageBootstrap @Inject constructor(
     private val bizScopeDriver: BizScopeDriver,
     @Suppress("unused") private val mediaScopeDriver: MediaScopeDriver,
+    @Suppress("unused") private val screenStateService: ScreenStateService,
     private val detailTitleService: DetailTitleService,
     private val playerLoadingService: PlayerLoadingService,
     private val playerErrorService: PlayerErrorService,

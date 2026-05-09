@@ -9,8 +9,8 @@ import javax.inject.Inject
 
 /**
  * 详情数据的 IO 封装：无状态，只暴露 suspend 加载入口。把"现在加载到了什么"放在调用方
- * （[BizScopeDriver]）的 stateFlow 里持有，是 theseus 那边 ViewRepository / BusinessScopeDriver
- * 的对应关系。
+ * （[BizScopeDriver]）的 stateFlow 里持有——Repo 退化成无状态 IO，状态机由 Driver 持有
+ * （详见 CLAUDE.md §2.1 / §3）。
  */
 @PageScope
 class PageDetailRepository @Inject constructor() {

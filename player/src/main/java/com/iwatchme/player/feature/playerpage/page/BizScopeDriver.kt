@@ -21,15 +21,14 @@ import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 /**
- * BizScopeDriver 是 PageScope 的状态机 + 编排器（对应 theseus 的 BusinessScopeDriverImpl）。
+ * BizScopeDriver 是 PageScope 的状态机 + 业务编排器。
  *
- * 在多业务版本里，它**注入两份 Subcomponent.Factory**（UGC / OGV），按 sealed [DetailData] 的运行时
- * 类型 when 分发到对应业务的 BizScope，对齐 theseus 那边
+ * 在多业务版本里，它**注入多份 Subcomponent.Factory**（UGC / OGV），按 sealed [DetailData] 的运行时
+ * 类型 when 分发到对应业务的 BizScope，例如：
  *
- *     when (viewReplyPack) {
- *         is UGCViewReplyPack -> ugcVideoComponentFactory.create(...)
- *         is OGVViewReplyPack -> ogvSeasonComponentFactory.create(...)
- *         is CheeseViewReplyPack -> cheeseBizComponentBuilderProvider.get()...
+ *     when (detail) {
+ *         is UGCDetail -> ugcBizComponentFactory.create(...)
+ *         is OGVDetail -> ogvBizComponentFactory.create(...)
  *     }
  *
  * 拿到的是统一的 [PlayerBizFacade]，写到 [CurrentBizComponentRepository] 里，Fragment 从 facade

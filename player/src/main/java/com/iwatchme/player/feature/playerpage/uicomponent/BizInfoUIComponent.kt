@@ -4,6 +4,7 @@ import android.content.Context
 import android.graphics.Color
 import android.view.ViewGroup
 import android.widget.TextView
+import androidx.core.view.isVisible
 import com.iwatchme.player.core.ui.UIComponent
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.StateFlow
@@ -25,7 +26,11 @@ class BizInfoUIComponent(
         val state: StateFlow<State>
     }
 
-    data class State(val text: String, val tagColor: Int = Color.parseColor("#666666"))
+    data class State(
+        val text: String,
+        val tagColor: Int = Color.parseColor("#666666"),
+        val visible: Boolean = true,
+    )
 
     override fun createViewEntry(
         context: Context,
@@ -51,6 +56,7 @@ class BizInfoUIComponent(
                 viewModel.state.collectLatest { state ->
                     viewEntry.value.text = state.text
                     viewEntry.value.setTextColor(state.tagColor)
+                    viewEntry.value.isVisible = state.visible
                 }
             }
         }

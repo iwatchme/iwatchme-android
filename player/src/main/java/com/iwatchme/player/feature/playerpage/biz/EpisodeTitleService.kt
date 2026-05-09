@@ -2,6 +2,7 @@ package com.iwatchme.player.feature.playerpage.biz
 
 import com.iwatchme.player.core.di.BizCoroutineScope
 import com.iwatchme.player.core.di.BizScope
+import com.iwatchme.player.feature.playerpage.page.ScreenStateRepository
 import com.iwatchme.player.feature.playerpage.uicomponent.EpisodeTitleUIComponent
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -14,14 +15,16 @@ import javax.inject.Inject
 /**
  * "正在播放：xxx" 标题的 Service。
  *
- * Service 同时持有 [SelectionRepository] 与 [VideoListRepository]，自己组合 id→item，
- * 满足"repo 之间不互相依赖、组合逻辑下沉到 Service"。
+ * 数据源：
+ *  - selection × items 解出当前 item 决定文案
+ *  - PageScope 的 ScreenStateRepository 决定可见性（横屏隐藏，对齐 CLAUDE.md §9.9）
  */
 @BizScope
 class EpisodeTitleService @Inject constructor(
     @BizCoroutineScope private val scope: CoroutineScope,
     private val selectionRepository: SelectionRepository,
     private val videoListRepository: VideoListRepository,
+    private val screenStateRepository: ScreenStateRepository,
 ) {
 
     private val _stateFlow = MutableStateFlow(EpisodeTitleUIComponent.State(text = ""))
@@ -35,13 +38,12 @@ class EpisodeTitleService @Inject constructor(
             combine(
                 selectionRepository.selectedItemIdFlow,
                 videoListRepository.itemsFlow,
-            ) { id, items ->
-                if (id != null) items.find { it.id == id } else null
-            }.collectLatest { item ->
-                _stateFlow.value = EpisodeTitleUIComponent.State(
-                    text = if (item != null) "正在播放：${item.title}" else "",
-                )
-            }
+                screenStateRepository.screenStateFlow,
+            ) { id, items, screenState ->
+                val item = if (id != null) items.find { it.id == id } else null
+                val text = if (item != null) "正在播放：${item.title}" else ""
+                EpisodeTitleUIComponent.State(text = text, visible = !screenState.isFullscreen)
+            }.collectLatest { _stateFlow.value = it }
         }
     }
 }

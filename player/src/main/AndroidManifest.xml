@@ -4,9 +4,16 @@
     <uses-permission android:name="android.permission.INTERNET" />
 
     <application>
+        <!--
+            configChanges 必须声明：横竖屏切换时不让系统销毁 / 重建 Activity，否则 PageScope 整个被
+            毁掉重建，ExoPlayer 跟着重新 prepare，用户看到的是"切横屏 = 视频从头开始"。
+            屏幕方向 / 尺寸 / 键盘 / UI 模式相关的配置变更全部由 Activity 自己处理（onConfigurationChanged），
+            ScreenStateService 则继续负责把状态写到 activity.requestedOrientation 上。
+        -->
         <activity
             android:name=".feature.playerpage.ui.PlayerPageActivity"
             android:exported="false"
-            android:theme="@style/Theme.Player" />
+            android:theme="@style/Theme.Player"
+            android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboardHidden|uiMode" />
     </application>
 </manifest>
