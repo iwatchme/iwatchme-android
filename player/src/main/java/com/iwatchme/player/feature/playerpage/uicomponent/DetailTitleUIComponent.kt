@@ -4,13 +4,27 @@ import android.content.Context
 import android.view.ViewGroup
 import android.widget.TextView
 import com.iwatchme.player.core.ui.UIComponent
-import com.iwatchme.player.model.DetailData
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.launch
 
+/**
+ * 数据向下、事件向上：UI Component 只看到 [ViewModel]，不直接接触任何 Repo。
+ */
 class DetailTitleUIComponent(
-    private val detailFlow: StateFlow<DetailData?>,
+    private val viewModel: ViewModel,
 ) : UIComponent<UIComponent.ViewViewEntry<TextView>> {
+
+    interface ViewModel {
+        val state: StateFlow<State>
+        val onClick: () -> Unit
+    }
+
+    data class State(
+        val text: String,
+        val clickable: Boolean,
+    )
 
     override fun createViewEntry(
         context: Context,
@@ -26,7 +40,6 @@ class DetailTitleUIComponent(
             textSize = 16f
             setTypeface(typeface, android.graphics.Typeface.BOLD)
             setBackgroundColor(0xFFFFFFFF.toInt())
-            text = "等待加载..."
         }
         return UIComponent.ViewViewEntry(textView)
     }
@@ -36,11 +49,14 @@ class DetailTitleUIComponent(
     }
 
     override suspend fun bindToView(viewEntry: UIComponent.ViewViewEntry<TextView>) {
-        detailFlow.collectLatest { detail ->
-            viewEntry.value.text = if (detail != null) {
-                "${detail.title}  （点击切合集）"
-            } else {
-                "等待加载..."
+        val view = viewEntry.value
+        view.setOnClickListener { viewModel.onClick() }
+        coroutineScope {
+            launch {
+                viewModel.state.collectLatest { state ->
+                    view.text = state.text
+                    view.isClickable = state.clickable
+                }
             }
         }
     }

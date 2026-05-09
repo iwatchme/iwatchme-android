@@ -2,38 +2,22 @@ package com.iwatchme.player.feature.playerpage.biz
 
 import android.util.Log
 import com.iwatchme.player.core.di.BizScope
-import com.iwatchme.player.model.VideoItem
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.map
 import javax.inject.Inject
 
+/**
+ * 当前选中的视频条目 id。
+ *
+ * 设计原则：repo 是小粒度被动数据源，**不依赖其他 repo**。这里只持有 id；
+ * 需要"由 id 解析出 VideoItem"的组合逻辑应当在 Service 里完成（Service 可以同时持有
+ * SelectionRepository 和 VideoListRepository 做 join）。
+ */
 @BizScope
-class SelectionRepository @Inject constructor(
-    private val videoListRepository: VideoListRepository,
-) {
+class SelectionRepository @Inject constructor() {
+
     private val _selectedItemIdFlow = MutableStateFlow<String?>(null)
     val selectedItemIdFlow: StateFlow<String?> = _selectedItemIdFlow
-
-    val selectedItemFlow: StateFlow<VideoItem?>
-        get() = object : StateFlow<VideoItem?> {
-            override val replayCache: List<VideoItem?>
-                get() = listOf(value)
-            override val value: VideoItem?
-                get() {
-                    val id = _selectedItemIdFlow.value ?: return null
-                    return videoListRepository.itemsFlow.value.find { it.id == id }
-                }
-
-            override suspend fun collect(collector: kotlinx.coroutines.flow.FlowCollector<VideoItem?>): Nothing {
-                _selectedItemIdFlow.collect { id ->
-                    val item = if (id != null) {
-                        videoListRepository.itemsFlow.value.find { it.id == id }
-                    } else null
-                    collector.emit(item)
-                }
-            }
-        }
 
     val selectedItemId: String? get() = _selectedItemIdFlow.value
 

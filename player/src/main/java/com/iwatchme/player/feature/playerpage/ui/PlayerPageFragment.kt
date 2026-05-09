@@ -13,8 +13,9 @@ import androidx.recyclerview.widget.LinearLayoutManager
 import com.iwatchme.player.PlayerSdk
 import com.iwatchme.player.core.ui.UIComponentAdapterImpl
 import com.iwatchme.player.databinding.FragmentPlayerPageBinding
-import com.iwatchme.player.feature.playerpage.di.PlayerBizComponent
+import com.iwatchme.player.feature.playerpage.di.PlayerBizFacade
 import com.iwatchme.player.feature.playerpage.di.PlayerPageComponent
+import com.iwatchme.player.feature.playerpage.uicomponent.BizInfoUIComponent
 import com.iwatchme.player.feature.playerpage.uicomponent.DetailTitleUIComponent
 import com.iwatchme.player.feature.playerpage.uicomponent.EpisodeTitleUIComponent
 import com.iwatchme.player.feature.playerpage.uicomponent.PlayerErrorUIComponent
@@ -39,6 +40,7 @@ class PlayerPageFragment : Fragment() {
     private var errorBindJob: Job? = null
     private var titleBindJob: Job? = null
     private var episodeTitleBindJob: Job? = null
+    private var bizInfoBindJob: Job? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -61,7 +63,7 @@ class PlayerPageFragment : Fragment() {
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
-        Log.d("Player", "[PlayerPageFragment] onViewCreated — binding PlayerView and starting anchor")
+        Log.d("Player", "[PlayerPageFragment] onViewCreated — binding PlayerView and starting bootstrap")
 
         pageComponent.playerViewBinder().bind(binding.playerView)
 
@@ -71,20 +73,15 @@ class PlayerPageFragment : Fragment() {
             adapter = listAdapter
         }
 
-        // 顶部合集标题（BizScope 数据），点击切合集
-        val titleComponent = DetailTitleUIComponent(pageComponent.pageDetailRepository().detailFlow)
+        // 顶部合集标题：UI Component 只看 Service 暴露的 ViewModel
+        val titleComponent = DetailTitleUIComponent(pageComponent.detailTitleService().viewModel)
         val titleEntry = titleComponent.wrapExistingView(binding.currentTitle)
         titleBindJob = viewLifecycleOwner.lifecycleScope.launch {
             titleComponent.bindToView(titleEntry)
         }
-        binding.currentTitle.setOnClickListener {
-            Log.d("Player", "[PlayerPageFragment] currentTitle clicked — cycling to next detail (BizScope rebuild)")
-            pageComponent.pageDetailRepository().cycleNextDetail()
-        }
 
         // loading / error overlay（PageScope 级别）
-        val uiStateRepo = pageComponent.playerUiStateRepository()
-        val loadingComponent = PlayerLoadingUIComponent(uiStateRepo.playbackStateFlow)
+        val loadingComponent = PlayerLoadingUIComponent(pageComponent.playerLoadingService().viewModel)
         val loadingEntry = loadingComponent.createViewEntry(requireContext())
         binding.playerOverlayContainer.removeAllViews()
         binding.playerOverlayContainer.addView(loadingEntry.root)
@@ -92,14 +89,14 @@ class PlayerPageFragment : Fragment() {
             loadingComponent.bindToView(loadingEntry)
         }
 
-        val errorComponent = PlayerErrorUIComponent(uiStateRepo.playbackStateFlow, uiStateRepo.errorMessageFlow)
+        val errorComponent = PlayerErrorUIComponent(pageComponent.playerErrorService().viewModel)
         val errorEntry = errorComponent.createViewEntry(requireContext())
         binding.playerOverlayContainer.addView(errorEntry.root)
         errorBindJob = viewLifecycleOwner.lifecycleScope.launch {
             errorComponent.bindToView(errorEntry)
         }
 
-        pageComponent.anchor().start()
+        pageComponent.bootstrap().start()
 
         observeBizScope()
     }
@@ -107,26 +104,36 @@ class PlayerPageFragment : Fragment() {
     private fun observeBizScope() {
         viewLifecycleOwner.lifecycleScope.launch {
             viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
-                pageComponent.bizComponentBridge().bizComponentFlow
+                pageComponent.currentBizComponentRepository().componentFlow
                     .filterNotNull()
-                    .collectLatest { bizComponent ->
-                        bindBizUI(bizComponent)
+                    .collectLatest { facade ->
+                        bindBizUI(facade)
                     }
             }
         }
     }
 
-    private fun bindBizUI(bizComponent: PlayerBizComponent) {
-        val service = bizComponent.bizRecyclerViewService()
-        Log.d("Player", "[PlayerPageFragment] BizComponent available — ${service.components.size} components")
-        listAdapter?.submitList(service.components)
+    /**
+     * 这里参数类型只是 [PlayerBizFacade]——Fragment 不知道当前是 UGCBizComponent 还是 OGVBizComponent。
+     * 业务差异由 [PlayerBizFacade.bizInfoService] 后面 @Binds 出的不同实现承载。
+     */
+    private fun bindBizUI(facade: PlayerBizFacade) {
+        Log.d("Player", "[PlayerPageFragment] BizComponent available — ${facade.javaClass.simpleName}")
+        listAdapter?.submitList(facade.bizRecyclerViewService().components)
 
-        // 当前播放集标题（EpisodeScope 等价数据，从 BizScope 的 SelectionRepository 读 selectedItemFlow）
         episodeTitleBindJob?.cancel()
-        val episodeTitleComponent = EpisodeTitleUIComponent(bizComponent.selectionRepository().selectedItemFlow)
+        val episodeTitleComponent = EpisodeTitleUIComponent(facade.episodeTitleService().viewModel)
         val episodeEntry = episodeTitleComponent.wrapExistingView(binding.episodeTitle)
         episodeTitleBindJob = viewLifecycleOwner.lifecycleScope.launch {
             episodeTitleComponent.bindToView(episodeEntry)
+        }
+
+        // 业务专属信息条：UGCBizComponent 给 UGCInfoService，OGVBizComponent 给 OGVSeasonService
+        bizInfoBindJob?.cancel()
+        val bizInfoComponent = BizInfoUIComponent(facade.bizInfoService().viewModel)
+        val bizInfoEntry = bizInfoComponent.wrapExistingView(binding.bizInfo)
+        bizInfoBindJob = viewLifecycleOwner.lifecycleScope.launch {
+            bizInfoComponent.bindToView(bizInfoEntry)
         }
     }
 
@@ -138,6 +145,7 @@ class PlayerPageFragment : Fragment() {
         errorBindJob?.cancel()
         titleBindJob?.cancel()
         episodeTitleBindJob?.cancel()
+        bizInfoBindJob?.cancel()
         listAdapter = null
         _binding = null
     }

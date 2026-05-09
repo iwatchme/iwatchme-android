@@ -1,7 +1,6 @@
 package com.iwatchme.player.feature.playerpage.biz.di
 
-import com.iwatchme.player.core.ui.RunningUIComponent
-import com.iwatchme.player.feature.playerpage.biz.VideoListItemComponentFactory
+import com.iwatchme.player.feature.playerpage.biz.VideoListItemService
 import com.iwatchme.player.feature.playerpage.biz.VideoListRepository
 import com.iwatchme.player.model.BizModuleType
 import dagger.Module
@@ -16,10 +15,10 @@ object VideoListModuleParser {
     @BizModuleTypeKey(BizModuleType.VIDEO_LIST)
     fun videoList(
         videoListRepository: VideoListRepository,
-        factory: VideoListItemComponentFactory,
+        videoListItemService: VideoListItemService,
     ): BizModuleMapper = BizModuleMapper {
         videoListRepository.itemsFlow.value.forEach { item ->
-            emit(RunningUIComponent(factory.create(item)))
+            emit(videoListItemService.create(item))
         }
     }
 }

@@ -2,22 +2,32 @@ package com.iwatchme.player.feature.playerpage.uicomponent
 
 import android.content.Context
 import android.graphics.Color
-import android.util.Log
 import android.util.TypedValue
 import android.view.Gravity
 import android.view.ViewGroup
 import android.widget.LinearLayout
 import android.widget.TextView
 import com.iwatchme.player.core.ui.UIComponent
-import com.iwatchme.player.model.VideoItem
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.launch
 
 class VideoListItemUIComponent(
-    private val item: VideoItem,
-    private val selectedIdFlow: StateFlow<String?>,
-    private val onClick: () -> Unit,
+    private val viewModel: ViewModel,
 ) : UIComponent<UIComponent.ViewViewEntry<LinearLayout>> {
+
+    interface ViewModel {
+        val state: StateFlow<State>
+        val onClick: () -> Unit
+        val identityKey: String
+    }
+
+    data class State(
+        val title: String,
+        val duration: String,
+        val isSelected: Boolean,
+    )
 
     override fun createViewEntry(
         context: Context,
@@ -67,36 +77,30 @@ class VideoListItemUIComponent(
         val titleView = layout.findViewById<TextView>(android.R.id.text1)
         val durationView = layout.findViewById<TextView>(android.R.id.text2)
 
-        titleView.text = item.title
-        durationView.text = formatDuration(item.durationMs)
-        layout.setOnClickListener { onClick() }
+        layout.setOnClickListener { viewModel.onClick() }
 
-        selectedIdFlow.collectLatest { selectedId ->
-            val isSelected = selectedId == item.id
-            if (isSelected) {
-                titleView.setTextColor(Color.parseColor("#FB7299"))
-                layout.setBackgroundColor(Color.parseColor("#FFF0F5"))
-            } else {
-                titleView.setTextColor(Color.parseColor("#333333"))
-                layout.setBackgroundColor(Color.TRANSPARENT)
+        coroutineScope {
+            launch {
+                viewModel.state.collectLatest { state ->
+                    titleView.text = state.title
+                    durationView.text = state.duration
+                    if (state.isSelected) {
+                        titleView.setTextColor(Color.parseColor("#FB7299"))
+                        layout.setBackgroundColor(Color.parseColor("#FFF0F5"))
+                    } else {
+                        titleView.setTextColor(Color.parseColor("#333333"))
+                        layout.setBackgroundColor(Color.TRANSPARENT)
+                    }
+                }
             }
         }
     }
 
     override fun viewReusingKey(): Any = "VideoListItem"
 
-    override fun contentEqualityKey(): Any = item.id
+    override fun contentEqualityKey(): Any = viewModel.identityKey
 
-    override fun identityEqualityKey(): Any = item.id
-
-    private fun formatDuration(ms: Long?): String {
-        if (ms == null) return ""
-        if (ms < 0) return "直播"
-        val totalSeconds = ms / 1000
-        val minutes = totalSeconds / 60
-        val seconds = totalSeconds % 60
-        return "%d:%02d".format(minutes, seconds)
-    }
+    override fun identityEqualityKey(): Any = viewModel.identityKey
 
     private fun dp(context: Context, value: Int): Int {
         return TypedValue.applyDimension(

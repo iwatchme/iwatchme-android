@@ -2,7 +2,7 @@ package com.iwatchme.player.feature.playerpage.di
 
 import com.iwatchme.player.core.di.EpisodeCoroutineScope
 import com.iwatchme.player.core.di.EpisodeScope
-import com.iwatchme.player.feature.playerpage.episode.EpisodeScopeAnchor
+import com.iwatchme.player.feature.playerpage.episode.EpisodeBootstrap
 import com.iwatchme.player.model.VideoItem
 import dagger.BindsInstance
 import dagger.Subcomponent
@@ -12,12 +12,11 @@ import kotlinx.coroutines.CoroutineScope
 @Subcomponent(
     modules = [
         EpisodeScopeModule::class,
-        EpisodeSubcomponentsModule::class,
     ],
 )
 interface CurrentEpisodeComponent {
 
-    fun anchor(): EpisodeScopeAnchor
+    fun bootstrap(): EpisodeBootstrap
 
     @Subcomponent.Factory
     interface Factory {

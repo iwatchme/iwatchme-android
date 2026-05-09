@@ -48,6 +48,21 @@
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toBottomOf="@id/playerContainer" />
 
+    <!-- 业务专属信息（UGC: UP主名 / OGV: 季度 + VIP 标签）—— 数据由当前 BizScope 决定 -->
+    <TextView
+        android:id="@+id/bizInfo"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:paddingStart="12dp"
+        android:paddingEnd="12dp"
+        android:paddingTop="6dp"
+        android:paddingBottom="6dp"
+        android:textSize="12sp"
+        android:background="#FFFFFF"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/currentTitle" />
+
     <!-- 当前播放集（EpisodeScope 数据，反映正在播放的样片名） -->
     <TextView
         android:id="@+id/episodeTitle"
@@ -63,7 +78,7 @@
         android:text=""
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@id/currentTitle" />
+        app:layout_constraintTop_toBottomOf="@id/bizInfo" />
 
     <!-- 视频列表 -->
     <androidx.recyclerview.widget.RecyclerView

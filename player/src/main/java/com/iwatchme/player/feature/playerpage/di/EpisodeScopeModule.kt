@@ -4,6 +4,3 @@ import dagger.Module
 
 @Module
 object EpisodeScopeModule
-
-@dagger.Module(subcomponents = [CurrentMediaComponent::class])
-object EpisodeSubcomponentsModule

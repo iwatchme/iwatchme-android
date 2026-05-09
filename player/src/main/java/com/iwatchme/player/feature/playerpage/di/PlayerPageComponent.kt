@@ -4,10 +4,12 @@ import com.iwatchme.player.core.di.PageCoroutineScope
 import com.iwatchme.player.core.di.PageScope
 import com.iwatchme.player.core.player.ExoPlayerHolder
 import com.iwatchme.player.core.player.PlayerViewBinder
-import com.iwatchme.player.feature.playerpage.page.BizComponentBridge
-import com.iwatchme.player.feature.playerpage.page.PageDetailRepository
-import com.iwatchme.player.feature.playerpage.page.PageScopeAnchor
-import com.iwatchme.player.feature.playerpage.page.PlayerUiStateRepository
+import com.iwatchme.player.feature.playerpage.page.CurrentBizComponentRepository
+import com.iwatchme.player.feature.playerpage.page.DetailTitleService
+import com.iwatchme.player.feature.playerpage.page.MediaScopeDriver
+import com.iwatchme.player.feature.playerpage.page.PageBootstrap
+import com.iwatchme.player.feature.playerpage.page.PlayerErrorService
+import com.iwatchme.player.feature.playerpage.page.PlayerLoadingService
 import dagger.BindsInstance
 import dagger.Subcomponent
 import kotlinx.coroutines.CoroutineScope
@@ -25,15 +27,17 @@ interface PlayerPageComponent {
 
     fun playerViewBinder(): PlayerViewBinder
 
-    fun bizComponentFactory(): PlayerBizComponent.Factory
+    fun bootstrap(): PageBootstrap
 
-    fun anchor(): PageScopeAnchor
+    fun currentBizComponentRepository(): CurrentBizComponentRepository
 
-    fun bizComponentBridge(): BizComponentBridge
+    fun detailTitleService(): DetailTitleService
 
-    fun pageDetailRepository(): PageDetailRepository
+    fun playerLoadingService(): PlayerLoadingService
 
-    fun playerUiStateRepository(): PlayerUiStateRepository
+    fun playerErrorService(): PlayerErrorService
+
+    fun mediaScopeDriver(): MediaScopeDriver
 
     @Subcomponent.Factory
     interface Factory {
@@ -43,5 +47,11 @@ interface PlayerPageComponent {
     }
 }
 
-@dagger.Module(subcomponents = [PlayerBizComponent::class])
+@dagger.Module(
+    subcomponents = [
+        UGCBizComponent::class,
+        OGVBizComponent::class,
+        CurrentMediaComponent::class,
+    ],
+)
 object PageSubcomponentsModule

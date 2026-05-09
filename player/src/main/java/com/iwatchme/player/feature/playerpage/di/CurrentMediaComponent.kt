@@ -2,7 +2,8 @@ package com.iwatchme.player.feature.playerpage.di
 
 import com.iwatchme.player.core.di.MediaCoroutineScope
 import com.iwatchme.player.core.di.MediaScope
-import com.iwatchme.player.feature.playerpage.media.MediaScopeAnchor
+import com.iwatchme.player.feature.playerpage.media.MediaBootstrap
+import com.iwatchme.player.model.VideoItem
 import dagger.BindsInstance
 import dagger.Subcomponent
 import kotlinx.coroutines.CoroutineScope
@@ -15,12 +16,13 @@ import kotlinx.coroutines.CoroutineScope
 )
 interface CurrentMediaComponent {
 
-    fun anchor(): MediaScopeAnchor
+    fun bootstrap(): MediaBootstrap
 
     @Subcomponent.Factory
     interface Factory {
         fun create(
             @BindsInstance @MediaCoroutineScope scope: CoroutineScope,
+            @BindsInstance item: VideoItem,
         ): CurrentMediaComponent
     }
 }

@@ -2,22 +2,29 @@ package com.iwatchme.player.feature.playerpage.uicomponent
 
 import android.content.Context
 import android.graphics.Color
-import android.util.TypedValue
 import android.view.Gravity
 import android.view.View
 import android.view.ViewGroup
 import android.widget.FrameLayout
 import android.widget.TextView
 import com.iwatchme.player.core.ui.UIComponent
-import com.iwatchme.player.model.PlaybackState
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.collectLatest
-import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.launch
 
 class PlayerErrorUIComponent(
-    private val playbackStateFlow: StateFlow<PlaybackState>,
-    private val errorMessageFlow: StateFlow<String?>,
+    private val viewModel: ViewModel,
 ) : UIComponent<UIComponent.ViewViewEntry<FrameLayout>> {
+
+    interface ViewModel {
+        val state: StateFlow<State>
+    }
+
+    data class State(
+        val visible: Boolean,
+        val message: String,
+    )
 
     override fun createViewEntry(
         context: Context,
@@ -40,7 +47,6 @@ class PlayerErrorUIComponent(
             )
             setTextColor(Color.WHITE)
             textSize = 14f
-            text = "播放出错"
         }
 
         frame.addView(textView)
@@ -48,15 +54,14 @@ class PlayerErrorUIComponent(
     }
 
     override suspend fun bindToView(viewEntry: UIComponent.ViewViewEntry<FrameLayout>) {
-        combine(playbackStateFlow, errorMessageFlow) { state, error ->
-            state to error
-        }.collectLatest { (state, error) ->
-            if (state == PlaybackState.ERROR) {
-                viewEntry.value.visibility = View.VISIBLE
-                viewEntry.value.findViewById<TextView>(android.R.id.message)?.text =
-                    error ?: "播放出错"
-            } else {
-                viewEntry.value.visibility = View.GONE
+        val frame = viewEntry.value
+        val text = frame.findViewById<TextView>(android.R.id.message)
+        coroutineScope {
+            launch {
+                viewModel.state.collectLatest { state ->
+                    frame.visibility = if (state.visible) View.VISIBLE else View.GONE
+                    text.text = state.message
+                }
             }
         }
     }

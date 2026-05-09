@@ -1,4 +1,4 @@
-# Red Engine 渲染播放入门指南
+# RenderEngine 渲染播放入门指南
 
 > 面向没有 OpenGL、EGL、FFmpeg、MediaCodec 经验的读者。
 > 目标不是背 API，而是看懂一帧画面如何从视频文件走到手机屏幕。
@@ -14,7 +14,7 @@
 
 ## 0. 一句话总览
 
-一帧视频画面在 Red Engine 中大致走这条路：
+一帧视频画面在 RenderEngine 中大致走这条路：
 
 ```text
 MP4 文件
@@ -252,7 +252,7 @@ eglSurface_ = eglCore_.createWindowSurface(window_);
 
 `EGLSurface` 是 GL 绘制结果的目标。
 
-在 Red Engine 里，这个目标来自 Android UI 层传进来的 `SurfaceView` 底层窗口。
+在 Render Engine 里，这个目标来自 Android UI 层传进来的 `SurfaceView` 底层窗口。
 
 ### 3.6 `eglMakeCurrent`
 

@@ -12,6 +12,12 @@ import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
+/**
+ * MediaScope 内的"准备播放"业务 Service：
+ *  1. 触发 CurrentMediaRepository 加载播放信息
+ *  2. 订阅 playbackInfoFlow，拿到 PlaybackInfo 后驱动 ExoPlayer 准备播放
+ *  3. 同步初始 loading 状态到 PlayerUiStateRepository（跨 scope 通信）
+ */
 @MediaScope
 class MediaPrepareService @Inject constructor(
     @MediaCoroutineScope private val scope: CoroutineScope,
@@ -23,6 +29,9 @@ class MediaPrepareService @Inject constructor(
     init {
         scope.launch {
             playerUiStateRepository.updatePlaybackState(PlaybackState.LOADING)
+
+            // Service 主动触发 repo 加载
+            currentMediaRepository.loadPlaybackInfo()
 
             currentMediaRepository.playbackInfoFlow
                 .filterNotNull()

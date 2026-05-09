@@ -1,7 +1,6 @@
 package com.iwatchme.player.feature.playerpage.uicomponent
 
 import android.content.Context
-import android.graphics.Color
 import android.util.TypedValue
 import android.view.Gravity
 import android.view.View
@@ -9,13 +8,20 @@ import android.view.ViewGroup
 import android.widget.FrameLayout
 import android.widget.ProgressBar
 import com.iwatchme.player.core.ui.UIComponent
-import com.iwatchme.player.model.PlaybackState
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.launch
 
 class PlayerLoadingUIComponent(
-    private val playbackStateFlow: StateFlow<PlaybackState>,
+    private val viewModel: ViewModel,
 ) : UIComponent<UIComponent.ViewViewEntry<FrameLayout>> {
+
+    interface ViewModel {
+        val state: StateFlow<State>
+    }
+
+    data class State(val visible: Boolean)
 
     override fun createViewEntry(
         context: Context,
@@ -43,8 +49,12 @@ class PlayerLoadingUIComponent(
     }
 
     override suspend fun bindToView(viewEntry: UIComponent.ViewViewEntry<FrameLayout>) {
-        playbackStateFlow.collectLatest { state ->
-            viewEntry.value.visibility = if (state == PlaybackState.LOADING) View.VISIBLE else View.GONE
+        coroutineScope {
+            launch {
+                viewModel.state.collectLatest { state ->
+                    viewEntry.value.visibility = if (state.visible) View.VISIBLE else View.GONE
+                }
+            }
         }
     }
 

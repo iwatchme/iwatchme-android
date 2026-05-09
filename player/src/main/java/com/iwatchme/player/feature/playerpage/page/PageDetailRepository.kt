@@ -1,41 +1,23 @@
 package com.iwatchme.player.feature.playerpage.page
 
 import android.util.Log
-import com.iwatchme.player.core.di.PageCoroutineScope
 import com.iwatchme.player.core.di.PageScope
 import com.iwatchme.player.feature.playerpage.mock.MockData
 import com.iwatchme.player.model.DetailData
-import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.launch
 import javax.inject.Inject
 
+/**
+ * 详情数据的 IO 封装：无状态，只暴露 suspend 加载入口。把"现在加载到了什么"放在调用方
+ * （[BizScopeDriver]）的 stateFlow 里持有，是 theseus 那边 ViewRepository / BusinessScopeDriver
+ * 的对应关系。
+ */
 @PageScope
-class PageDetailRepository @Inject constructor(
-    @PageCoroutineScope private val scope: CoroutineScope,
-) {
-    private val _detailFlow = MutableStateFlow<DetailData?>(null)
-    val detailFlow: StateFlow<DetailData?> = _detailFlow
+class PageDetailRepository @Inject constructor() {
 
-    fun load() {
-        Log.d("Player", "[PageDetailRepository] load() triggered, requesting initial detail data...")
-        scope.launch {
-            delay(500)
-            val detail = MockData.initialDetail
-            Log.d("Player", "[PageDetailRepository] Detail loaded: bvid=${detail.bvid}, title=${detail.title}, items=${detail.items.size}")
-            _detailFlow.value = detail
-        }
-    }
-
-    fun cycleNextDetail() {
-        val current = _detailFlow.value
-        scope.launch {
-            val next = if (current != null) MockData.nextDetailAfter(current) else MockData.initialDetail
-            Log.d("Player", "[PageDetailRepository] cycleNextDetail: ${current?.title ?: "null"} -> ${next.title}")
-            delay(200)
-            _detailFlow.value = next
-        }
+    suspend fun loadDetail(bvid: String): Result<DetailData> = runCatching {
+        Log.d("Player", "[PageDetailRepository] loadDetail bvid=$bvid")
+        delay(500)
+        MockData.findByBvid(bvid) ?: error("Detail not found for bvid=$bvid")
     }
 }
