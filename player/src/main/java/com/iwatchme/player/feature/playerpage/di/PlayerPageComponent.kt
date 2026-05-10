@@ -9,10 +9,13 @@ import com.iwatchme.player.feature.playerpage.page.CurrentBizComponentRepository
 import com.iwatchme.player.feature.playerpage.page.DetailTitleService
 import com.iwatchme.player.feature.playerpage.page.MediaScopeDriver
 import com.iwatchme.player.feature.playerpage.page.PageBootstrap
+import com.iwatchme.player.feature.playerpage.page.PlaybackProgressService
 import com.iwatchme.player.feature.playerpage.page.PlayerErrorService
+import com.iwatchme.player.feature.playerpage.page.PlayerGestureService
 import com.iwatchme.player.feature.playerpage.page.PlayerLoadingService
 import com.iwatchme.player.feature.playerpage.page.ScreenStateRepository
 import com.iwatchme.player.feature.playerpage.page.ScreenStateService
+import com.iwatchme.player.feature.playerpage.page.TripleSpeedService
 import dagger.BindsInstance
 import dagger.Subcomponent
 import kotlinx.coroutines.CoroutineScope
@@ -45,6 +48,12 @@ interface PlayerPageComponent {
     fun screenStateRepository(): ScreenStateRepository
 
     fun screenStateService(): ScreenStateService
+
+    fun playerGestureService(): PlayerGestureService
+
+    fun tripleSpeedService(): TripleSpeedService
+
+    fun playbackProgressService(): PlaybackProgressService
 
     @Subcomponent.Factory
     interface Factory {

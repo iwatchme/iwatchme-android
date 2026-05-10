@@ -20,13 +20,69 @@
         <androidx.media3.ui.PlayerView
             android:id="@+id/playerView"
             android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            app:use_controller="false" />
+
+        <!-- 手势 surface：吃所有 MotionEvent，PlayerGestureSurfaceUIComponent 负责挂 listener。
+             置于 playerView 之上、overlay 之下：fullscreen 按钮（在 overlay 内）能优先消费点击；
+             空白区域 touch 落到本层，PlayerView 的 controller 已 use_controller=false 关闭。 -->
+        <FrameLayout
+            android:id="@+id/gestureSurface"
+            android:layout_width="match_parent"
             android:layout_height="match_parent" />
 
-        <!-- loading / error overlay 会动态添加到这里 -->
+        <!-- loading / error / 手势 indicator overlay 动态添加到这里 -->
         <FrameLayout
             android:id="@+id/playerOverlayContainer"
             android:layout_width="match_parent"
             android:layout_height="match_parent" />
+
+        <!-- 底部播放控制栏：[SeekBar][时间][全屏按钮] —— 标准播放器布局。
+             SeekBar 的可拖动属性会拦截手势 surface 的横滑事件，但只在底部一行；
+             其他区域横滑仍能落到 gestureSurface 触发 seek 手势。 -->
+        <LinearLayout
+            android:id="@+id/playbackControlBar"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_gravity="bottom"
+            android:background="#66000000"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:paddingStart="8dp"
+            android:paddingTop="4dp"
+            android:paddingEnd="8dp"
+            android:paddingBottom="4dp">
+
+            <SeekBar
+                android:id="@+id/playbackSeekBar"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1" />
+
+            <TextView
+                android:id="@+id/playbackTimeText"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="8dp"
+                android:textColor="#FFFFFF"
+                android:textSize="12sp"
+                android:text="00:00 / 00:00" />
+
+            <TextView
+                android:id="@+id/fullscreenButton"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="12dp"
+                android:clickable="true"
+                android:focusable="true"
+                android:paddingStart="6dp"
+                android:paddingTop="4dp"
+                android:paddingEnd="6dp"
+                android:paddingBottom="4dp"
+                android:textColor="#FFFFFF"
+                android:textSize="18sp" />
+
+        </LinearLayout>
 
     </FrameLayout>
 

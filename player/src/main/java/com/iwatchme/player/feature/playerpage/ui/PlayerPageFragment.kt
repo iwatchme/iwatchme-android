@@ -21,7 +21,9 @@ import com.iwatchme.player.feature.playerpage.uicomponent.DetailTitleUIComponent
 import com.iwatchme.player.feature.playerpage.uicomponent.EpisodeTitleUIComponent
 import com.iwatchme.player.feature.playerpage.uicomponent.FullscreenButtonUIComponent
 import com.iwatchme.player.feature.playerpage.uicomponent.PanelVisibilityUIComponent
+import com.iwatchme.player.feature.playerpage.uicomponent.PlaybackProgressUIComponent
 import com.iwatchme.player.feature.playerpage.uicomponent.PlayerErrorUIComponent
+import com.iwatchme.player.feature.playerpage.uicomponent.PlayerGestureOverlayUIComponent
 import com.iwatchme.player.feature.playerpage.uicomponent.PlayerLoadingUIComponent
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.cancel
@@ -46,6 +48,9 @@ class PlayerPageFragment : Fragment() {
     private var episodeTitleBindJob: Job? = null
     private var bizInfoBindJob: Job? = null
     private var listVisibilityBindJob: Job? = null
+    private var gestureSurfaceBindJob: Job? = null
+    private var gestureOverlayBindJob: Job? = null
+    private var playbackProgressBindJob: Job? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -102,14 +107,39 @@ class PlayerPageFragment : Fragment() {
             errorComponent.bindToView(errorEntry)
         }
 
-        // 全屏按钮 —— Fragment 完全不知道 ScreenStateRepository 存在，只 bind UIComponent
+        // 底部播放控制栏：[SeekBar][时间][全屏按钮] —— layout 提供固定 view，UIComponent 走 wrap 路径
         val fullscreenBtn = FullscreenButtonUIComponent(
             pageComponent.screenStateService().fullscreenButtonViewModel,
         )
-        val fullscreenEntry = fullscreenBtn.createViewEntry(requireContext())
-        binding.playerOverlayContainer.addView(fullscreenEntry.root)
+        val fullscreenEntry = fullscreenBtn.wrapExistingView(binding.fullscreenButton)
         fullscreenBtnBindJob = viewLifecycleOwner.lifecycleScope.launch {
             fullscreenBtn.bindToView(fullscreenEntry)
+        }
+
+        val progressComponent = PlaybackProgressUIComponent(
+            pageComponent.playbackProgressService().viewModel,
+        )
+        val progressEntry = progressComponent.wrapExistingViews(
+            binding.playbackSeekBar,
+            binding.playbackTimeText,
+        )
+        playbackProgressBindJob = viewLifecycleOwner.lifecycleScope.launch {
+            progressComponent.bindToView(progressEntry)
+        }
+
+        // 手势 surface + 中央 indicator overlay —— Fragment 不接触 dispatchTouchEvent / overlay state
+        val gestureService = pageComponent.playerGestureService()
+        val gestureSurfaceEntry = gestureService.gestureSurfaceUIComponent
+            .wrapExistingView(binding.gestureSurface)
+        gestureSurfaceBindJob = viewLifecycleOwner.lifecycleScope.launch {
+            gestureService.gestureSurfaceUIComponent.bindToView(gestureSurfaceEntry)
+        }
+
+        val gestureOverlay = PlayerGestureOverlayUIComponent(gestureService.gestureOverlayViewModel)
+        val gestureOverlayEntry = gestureOverlay.createViewEntry(requireContext())
+        binding.playerOverlayContainer.addView(gestureOverlayEntry.root)
+        gestureOverlayBindJob = viewLifecycleOwner.lifecycleScope.launch {
+            gestureOverlay.bindToView(gestureOverlayEntry)
         }
 
         pageComponent.bootstrap().start()
@@ -167,6 +197,9 @@ class PlayerPageFragment : Fragment() {
         episodeTitleBindJob?.cancel()
         bizInfoBindJob?.cancel()
         listVisibilityBindJob?.cancel()
+        gestureSurfaceBindJob?.cancel()
+        gestureOverlayBindJob?.cancel()
+        playbackProgressBindJob?.cancel()
         listAdapter = null
         _binding = null
     }

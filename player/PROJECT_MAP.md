@@ -58,6 +58,9 @@ AppScope（AppComponent）
 | Repository | `CurrentBizComponentRepository` | `page/CurrentBizComponentRepository.kt` | 持有当前激活的 `PlayerBizFacade`。Fragment 通过它感知 BizComponent 的建立与销毁，不依赖具体 UGC/OGV 类型。 |
 | Repository | `ScreenStateRepository` | `page/ScreenStateRepository.kt` | 屏幕状态（`PORTRAIT_HALF` / `LANDSCAPE_FULL`）的纯持有者，暴露 `switchToFullscreen / switchToHalfscreen / toggle` 入口。放 PageScope 是因为切合集 / 切集都不该重置横屏状态。 |
 | Service | `ScreenStateService` | `page/ScreenStateService.kt` | 屏幕状态的输入聚合 + imperative side-effect：重力感应 → 写 repo；订阅 repo → 调 `activity.requestedOrientation`、注册 `OnBackPressedCallback`、暴露 `fullscreenButtonViewModel`。Fragment **不参与**任何 screen state 订阅，全部由本 service 完成（CLAUDE.md §9.8 / §9.9）。注入 `ComponentActivity`（PageScope `@BindsInstance`）。 |
+| Service | `PlayerGestureService` | `page/PlayerGestureService.kt` | 播放器手势输入聚合 + **listener 注册中心**。内部持 `PlayerGestureDetector`（识别双击/单击/长按/垂直滑动/水平滑动，双击/单击/长按走 `PriorityGestureProcessor` 优先级链）+ `BrightnessVolumeController`。**默认 listener 挂 `PRIORITY_LOWEST`**（双击 toggle play/pause / 横滑 seek / 竖滑亮度音量），业务通过 `addOnLongPressListener` 等接口在 `PRIORITY_NORMAL` 注入即可短路覆盖。暴露 `gestureSurfaceUIComponent` + `gestureOverlayViewModel` + `emitOverlayState(state)`（业务推送 indicator）。注入 `ComponentActivity` + `Context` + `ExoPlayerHolder` + `AudioManager`（PageScope @Provides）。 |
+| Service | `TripleSpeedService` | `page/TripleSpeedService.kt` | 长按 3x 倍速业务 service。装配模式："init 里 launch + addListener + try/awaitCancellation/finally" 保证 PageScope 死亡时反注册。注入 `PlayerGestureService` 调 `addOnLongPressListener`：onLongPress 时若已在播放则 `player.setPlaybackSpeed(3f)` + 振动 30ms + emit `OverlayState.TripleSpeed(3f)`；onLongPressEnd 恢复 1f + emit Hidden。 |
+| Service | `PlaybackProgressService` | `page/PlaybackProgressService.kt` | 底部进度条数据源。**轮询 + Listener 双源**：500ms 轮询 ExoPlayer `currentPosition / bufferedPosition / duration` 写自身 StateFlow；同时挂 `Player.Listener` 监听 `onPositionDiscontinuity` / `onPlaybackStateChanged` 立即推一次。**拖动保护**：`isUserSeeking` 屏蔽轮询写入避免 SeekBar 被抢回；UI 调 `viewModel.onSeekStop(positionMs)` 提交 `player.seekTo` 后释放并立即推送最新位置。放 PageScope 因为 ExoPlayer 也是 PageScope 单例、切集时 player 自动 reset 进度，service 不需要感知 MediaScope 切换。 |
 
 ---
 
@@ -221,7 +224,13 @@ feature/playerpage/
 │   ├── PlayerUiStateRepository.kt              completionEvents 是 SharedFlow
 │   ├── CurrentBizComponentRepository.kt
 │   ├── ScreenStateRepository.kt                屏幕状态 + switchToFullscreen / switchToHalfscreen
-│   └── ScreenStateService.kt                   sensor + activity orientation + back press 全收口
+│   ├── ScreenStateService.kt                   sensor + activity orientation + back press 全收口
+│   ├── PlayerGestureService.kt                 手势输入聚合 + listener 注册中心（默认实现挂 LOWEST）
+│   ├── PlayerGestureDetector.kt                手势识别核心（无 DI，方向锁定 + 长按识别）
+│   ├── PriorityGestureProcessor.kt             listener 优先级链（HIGH→NORMAL→LOW→LOWEST 短路）
+│   ├── BrightnessVolumeController.kt           音量/亮度副作用类（无 DI，含归一化进度计算）
+│   ├── TripleSpeedService.kt                   长按 3x 倍速业务 service（注入 PlayerGestureService 注册 LongPress listener）
+│   └── PlaybackProgressService.kt              底部进度条数据源（轮询 ExoPlayer position + Listener 双源，含拖动保护）
 ├── biz/                                        BizScope 资产
 │   ├── BizBootstrap.kt
 │   ├── EpisodeScopeDriver.kt

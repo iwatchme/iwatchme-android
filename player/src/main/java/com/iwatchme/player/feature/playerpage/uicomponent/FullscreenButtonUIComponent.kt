@@ -33,6 +33,10 @@ class FullscreenButtonUIComponent(
         val contentDescription: String,
     )
 
+    fun wrapExistingView(textView: TextView): UIComponent.ViewViewEntry<TextView> {
+        return UIComponent.ViewViewEntry(textView)
+    }
+
     override fun createViewEntry(
         context: Context,
         parent: ViewGroup?,
