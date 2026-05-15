@@ -6,8 +6,10 @@ import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
+import android.content.Context
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.itemsIndexed
@@ -43,6 +45,48 @@ class RenderEngineDemoActivity : ComponentActivity() {
     }
 }
 
+private data class SubtitleAsset(val label: String, val assetPath: String)
+private data class FontAsset(val label: String, val assetPath: String)
+
+// 字幕/字体资产清单。这里只列出 assets 下已捆绑的文件，
+// 字体文件需提前放入 app/src/main/assets/fonts/ 才会显示。
+private val BUNDLED_SUBTITLES = listOf(
+    SubtitleAsset("无字幕", ""),
+    SubtitleAsset("中文示例", "subtitles/sample_zh.srt"),
+    SubtitleAsset("英文示例", "subtitles/sample_en.srt"),
+    SubtitleAsset("中英混排", "subtitles/sample_mixed.srt"),
+)
+
+private val BUNDLED_FONTS = listOf(
+    FontAsset("Noto Sans SC (Regular)", "fonts/NotoSansSC-Regular.ttf"),
+    FontAsset("Noto Sans SC (Bold)", "fonts/NotoSansSC-Bold.ttf"),
+    FontAsset("Noto Serif SC", "fonts/NotoSerifSC-Regular.ttf"),
+    FontAsset("Roboto (Latin)", "fonts/Roboto-Regular.ttf"),
+)
+
+private fun copyAssetToCache(ctx: Context, assetPath: String): String? {
+    if (assetPath.isEmpty()) return null
+    val name = assetPath.substringAfterLast('/')
+    val outFile = File(ctx.cacheDir, name)
+    if (outFile.exists() && outFile.length() > 0) return outFile.absolutePath
+    return try {
+        ctx.assets.open(assetPath).use { input ->
+            outFile.outputStream().use { output -> input.copyTo(output) }
+        }
+        outFile.absolutePath
+    } catch (e: Exception) {
+        null
+    }
+}
+
+private fun assetExists(ctx: Context, assetPath: String): Boolean {
+    return try {
+        ctx.assets.open(assetPath).use { true }
+    } catch (_: Exception) {
+        false
+    }
+}
+
 @Composable
 fun RenderEngineDemoScreen() {
     var engineView by remember { mutableStateOf<RenderEngineView?>(null) }
@@ -59,6 +103,32 @@ fun RenderEngineDemoScreen() {
     // 叠加轨道片段列表
     val overlayClips = remember { mutableStateListOf<String>() }
     var overlayAlpha by remember { mutableStateOf(0.5f) }
+
+    // 字幕状态
+    val availableSubtitles = remember { BUNDLED_SUBTITLES }
+    val availableFonts = remember { BUNDLED_FONTS.filter { assetExists(context, it.assetPath) } }
+    var selectedSubtitleIdx by remember { mutableStateOf(0) }
+    var selectedFontIdx by remember { mutableStateOf(0) }
+    var subtitleEnabled by remember { mutableStateOf(false) }
+    var subtitleFontSize by remember { mutableStateOf(48) }
+
+    fun applySubtitleConfig() {
+        val engine = engineView?.engine ?: return
+        val sub = availableSubtitles.getOrNull(selectedSubtitleIdx)
+        val font = availableFonts.getOrNull(selectedFontIdx)
+        if (sub == null || sub.assetPath.isEmpty() || font == null) {
+            engine.setSubtitleEnabled(false)
+            return
+        }
+        val srtPath = copyAssetToCache(context, sub.assetPath)
+        val fontPath = copyAssetToCache(context, font.assetPath)
+        if (srtPath != null && fontPath != null) {
+            engine.setSubtitle(srtPath, fontPath, subtitleFontSize)
+            engine.setSubtitleEnabled(subtitleEnabled)
+        } else {
+            statusText = "Failed to stage subtitle/font assets"
+        }
+    }
 
     // File picker: copy selected video to cache dir, add to clip list
     val filePickerLauncher = rememberLauncherForActivityResult(
@@ -353,10 +423,101 @@ fun RenderEngineDemoScreen() {
                         )
                     }
                 }
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                // ---- 字幕区 ----
+                Text("字幕", color = Color(0xFF80CBC4), fontSize = 12.sp)
+                Spacer(modifier = Modifier.height(4.dp))
+                LazyRow(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    itemsIndexed(availableSubtitles) { index, item ->
+                        val selected = index == selectedSubtitleIdx
+                        Box(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(6.dp))
+                                .background(if (selected) Color(0xFF00897B) else Color(0xFF333333))
+                                .padding(horizontal = 12.dp, vertical = 6.dp)
+                                .clickable {
+                                    selectedSubtitleIdx = index
+                                    subtitleEnabled = item.assetPath.isNotEmpty()
+                                    applySubtitleConfig()
+                                }
+                        ) {
+                            Text(item.label, color = Color.White, fontSize = 11.sp)
+                        }
+                    }
+                }
+                Spacer(modifier = Modifier.height(8.dp))
+
+                if (availableFonts.isEmpty()) {
+                    Text(
+                        "字体未捆绑 — 请把 .ttf 放进 app/src/main/assets/fonts/",
+                        color = Color(0xFFEF9A9A),
+                        fontSize = 11.sp
+                    )
+                } else {
+                    Text("字体", color = Color(0xFF80CBC4), fontSize = 12.sp)
+                    Spacer(modifier = Modifier.height(4.dp))
+                    LazyRow(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        itemsIndexed(availableFonts) { index, item ->
+                            val selected = index == selectedFontIdx
+                            Box(
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(6.dp))
+                                    .background(if (selected) Color(0xFF00897B) else Color(0xFF333333))
+                                    .padding(horizontal = 12.dp, vertical = 6.dp)
+                                    .clickable {
+                                        selectedFontIdx = index
+                                        applySubtitleConfig()
+                                    }
+                            ) {
+                                Text(item.label, color = Color.White, fontSize = 11.sp)
+                            }
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    "字号: ${subtitleFontSize}px",
+                    color = Color(0xFF80CBC4),
+                    fontSize = 11.sp
+                )
+                Slider(
+                    value = subtitleFontSize.toFloat(),
+                    onValueChange = { subtitleFontSize = it.toInt().coerceIn(16, 96) },
+                    onValueChangeFinished = { applySubtitleConfig() },
+                    valueRange = 16f..96f,
+                    modifier = Modifier.fillMaxWidth()
+                )
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Button(
+                        onClick = {
+                            subtitleEnabled = !subtitleEnabled
+                            engineView?.engine?.setSubtitleEnabled(subtitleEnabled)
+                        },
+                        colors = ButtonDefaults.buttonColors(
+                            backgroundColor = if (subtitleEnabled) Color(0xFF00897B) else Color(0xFF555555)
+                        ),
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Text(if (subtitleEnabled) "Sub ON" else "Sub OFF", color = Color.White)
+                    }
+                }
             }
         }
     }
 }
+
 
 private fun formatTime(ms: Long): String {
     val totalSeconds = ms / 1000

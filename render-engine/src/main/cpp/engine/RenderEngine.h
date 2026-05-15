@@ -39,6 +39,10 @@ public:
     int getVideoHeight() const;
 
     void setOverlayAlpha(float alpha);
+    void setSubtitle(const std::string& srtPath,
+                     const std::string& fontPath,
+                     int fontSizePx);
+    void setSubtitleEnabled(bool enabled);
     void setCallback(PlaybackCallback* cb) { callback_ = cb; }
 
 private:

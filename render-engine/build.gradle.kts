@@ -26,7 +26,10 @@ android {
     }
 
     sourceSets.getByName("main") {
-        jniLibs.srcDir("../ffmpeg_library/android/libs")
+        jniLibs.srcDirs(
+            "../ffmpeg_library/android/libs",
+            "../freetype_library/android/libs",
+        )
     }
 }
 

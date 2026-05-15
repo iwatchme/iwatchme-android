@@ -253,6 +253,26 @@ Java_com_iwatchme_renderengine_RenderEngine_nativeSetOverlayAlpha(JNIEnv* /* env
     getEngine(handle)->setOverlayAlpha((float)alpha);
 }
 
+extern "C" JNIEXPORT void JNICALL
+Java_com_iwatchme_renderengine_RenderEngine_nativeSetSubtitle(JNIEnv* env, jobject /* this */,
+                                                              jlong handle,
+                                                              jstring srtPath,
+                                                              jstring fontPath,
+                                                              jint fontSizePx) {
+    const char* srtC = srtPath ? env->GetStringUTFChars(srtPath, nullptr) : "";
+    const char* fontC = fontPath ? env->GetStringUTFChars(fontPath, nullptr) : "";
+    std::string srt = srtC ? srtC : "";
+    std::string font = fontC ? fontC : "";
+    if (srtPath) env->ReleaseStringUTFChars(srtPath, srtC);
+    if (fontPath) env->ReleaseStringUTFChars(fontPath, fontC);
+    getEngine(handle)->setSubtitle(srt, font, (int)fontSizePx);
+}
+
+extern "C" JNIEXPORT void JNICALL
+Java_com_iwatchme_renderengine_RenderEngine_nativeSetSubtitleEnabled(JNIEnv* /* env */, jobject /* this */, jlong handle, jboolean enabled) {
+    getEngine(handle)->setSubtitleEnabled(enabled == JNI_TRUE);
+}
+
 extern "C" JNIEXPORT jlong JNICALL
 Java_com_iwatchme_renderengine_RenderEngine_nativeGetPosition(JNIEnv* /* env */, jobject /* this */, jlong handle) {
     return getEngine(handle)->getPosition();

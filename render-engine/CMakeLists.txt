@@ -16,6 +16,13 @@ endforeach()
 
 include_directories(${FFMPEG_DIR}/${FFMPEG_ABI}/include)
 
+# FreeType prebuilt
+set(FREETYPE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/../freetype_library/android)
+add_library(freetype SHARED IMPORTED)
+set_target_properties(freetype PROPERTIES
+    IMPORTED_LOCATION ${FREETYPE_DIR}/${FFMPEG_ABI}/lib/libfreetype.so)
+include_directories(${FREETYPE_DIR}/${FFMPEG_ABI}/include/freetype2)
+
 # Source files
 set(SOURCES
     src/main/cpp/render_engine_jni.cpp
@@ -30,6 +37,7 @@ set(SOURCES
     src/main/cpp/core/SourceNode.cpp
     src/main/cpp/core/OutputNode.cpp
     src/main/cpp/core/BlendNode.cpp
+    src/main/cpp/core/SubtitleNode.cpp
     src/main/cpp/render/RenderGraphBuilder.cpp
     src/main/cpp/audio/AudioOutput.cpp
     src/main/cpp/engine/DecoderConfig.cpp
@@ -40,6 +48,8 @@ set(SOURCES
     src/main/cpp/pipeline/AudioPipeline.cpp
     src/main/cpp/pipeline/VideoTrackPipeline.cpp
     src/main/cpp/sync/VideoSyncController.cpp
+    src/main/cpp/subtitle/SrtParser.cpp
+    src/main/cpp/subtitle/TextRenderer.cpp
 )
 
 add_library(render-engine SHARED ${SOURCES})
@@ -55,6 +65,7 @@ target_include_directories(render-engine PRIVATE
     src/main/cpp/engine
     src/main/cpp/pipeline
     src/main/cpp/sync
+    src/main/cpp/subtitle
 )
 
 # NDK system libraries
@@ -66,6 +77,7 @@ find_library(mediandk-lib mediandk)
 
 target_link_libraries(render-engine
     avcodec avformat avutil swresample swscale
+    freetype
     ${log-lib}
     ${android-lib}
     ${egl-lib}

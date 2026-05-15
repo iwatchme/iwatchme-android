@@ -1,0 +1,20 @@
+1
+00:00:00,500 --> 00:00:03,500
+RenderEngine subtitle showcase
+
+2
+00:00:04,000 --> 00:00:07,500
+FreeType glyph rasterization
+composited onto the GL pipeline
+
+3
+00:00:08,000 --> 00:00:11,500
+Try switching the font selector below
+
+4
+00:00:12,000 --> 00:00:15,500
+Seek the timeline to test sync
+
+5
+00:00:16,000 --> 00:00:20,000
+The quick brown fox jumps over the lazy dog

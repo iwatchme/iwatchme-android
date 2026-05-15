@@ -41,6 +41,11 @@ public:
     void setOverlayAlpha(float alpha);
     void setPlaybackCompletedHandler(std::function<void()> handler);
 
+    void setSubtitle(const std::string& srtPath,
+                     const std::string& fontPath,
+                     int fontSizePx);
+    void setSubtitleEnabled(bool enabled);
+
 private:
     enum class SeekMode {
         FastPreview,
@@ -168,4 +173,11 @@ private:
     std::condition_variable cmdCond_;
 
     std::function<void()> playbackCompletedHandler_;
+
+    std::mutex subtitleMutex_;
+    std::string subtitlePath_;
+    std::string subtitleFontPath_;
+    int subtitleFontSizePx_ = 48;
+    std::atomic<bool> subtitleEnabled_{false};
+    std::atomic<bool> subtitleConfigChanged_{false};
 };

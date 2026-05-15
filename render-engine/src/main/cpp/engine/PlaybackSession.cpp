@@ -115,6 +115,28 @@ void PlaybackSession::setPlaybackCompletedHandler(std::function<void()> handler)
     playbackCompletedHandler_ = std::move(handler);
 }
 
+void PlaybackSession::setSubtitle(const std::string& srtPath,
+                                  const std::string& fontPath,
+                                  int fontSizePx) {
+    {
+        std::lock_guard<std::mutex> lk(subtitleMutex_);
+        subtitlePath_ = srtPath;
+        subtitleFontPath_ = fontPath;
+        subtitleFontSizePx_ = fontSizePx > 0 ? fontSizePx : 48;
+    }
+    subtitleConfigChanged_.store(true);
+    cmdCond_.notify_one();
+    LOGI("PlaybackSession: setSubtitle srt=%s font=%s size=%d",
+         srtPath.c_str(), fontPath.c_str(), fontSizePx);
+}
+
+void PlaybackSession::setSubtitleEnabled(bool enabled) {
+    subtitleEnabled_.store(enabled);
+    subtitleConfigChanged_.store(true);
+    cmdCond_.notify_one();
+    LOGI("PlaybackSession: setSubtitleEnabled %d", enabled ? 1 : 0);
+}
+
 int64_t PlaybackSession::getAudioClockUs() const {
     return audioPipeline_ ? audioPipeline_->getAudioClockUs() : -1;
 }
@@ -325,6 +347,12 @@ void PlaybackSession::releaseOverlayPipeline(JNIEnv* env) {
 
 void PlaybackSession::buildRenderTree(int surfaceWidth, int surfaceHeight) {
     if (!primaryTrack_ || !primaryTrack_->sourceNode() || !renderGraphBuilder_) return;
+    {
+        std::lock_guard<std::mutex> lk(subtitleMutex_);
+        renderGraphBuilder_->setSubtitleConfig(
+            subtitlePath_, subtitleFontPath_, subtitleFontSizePx_);
+    }
+    renderGraphBuilder_->setSubtitleEnabled(subtitleEnabled_.load());
     renderGraphBuilder_->rebuild(
         primaryTrack_->sourceNode(),
         (hasOverlay_ && overlayTrack_) ? overlayTrack_->sourceNode() : nullptr,
@@ -342,6 +370,11 @@ void PlaybackSession::renderThreadFunc() {
     while (running_.load()) {
         if (handleSurfaceLifecycle(ctx)) continue;
         if (handleSourceLifecycle(ctx)) continue;
+        if (subtitleConfigChanged_.load() && pipelineInitialized_ && eglSurface_ != EGL_NO_SURFACE) {
+            subtitleConfigChanged_.store(false);
+            buildRenderTree(ctx.surfaceWidth, ctx.surfaceHeight);
+            continue;
+        }
         if (handlePendingFastSeek(ctx)) continue;
         if (handlePendingExactSeek(ctx)) continue;
         if (handleIdleState(ctx)) continue;

@@ -9,6 +9,7 @@
 /captures
 .externalNativeBuild
 .cxx
+.build/
 local.properties
 .idea/*
 .claude/settings.local.json

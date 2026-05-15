@@ -79,6 +79,14 @@ class RenderEngine {
         if (nativeHandle != 0L) nativeSetOverlayAlpha(nativeHandle, alpha)
     }
 
+    fun setSubtitle(srtPath: String, fontPath: String, fontSizePx: Int = 48) {
+        if (nativeHandle != 0L) nativeSetSubtitle(nativeHandle, srtPath, fontPath, fontSizePx)
+    }
+
+    fun setSubtitleEnabled(enabled: Boolean) {
+        if (nativeHandle != 0L) nativeSetSubtitleEnabled(nativeHandle, enabled)
+    }
+
     fun play() {
         if (nativeHandle != 0L) nativePlay(nativeHandle)
     }
@@ -136,6 +144,8 @@ class RenderEngine {
     private external fun nativeSetTimeline(handle: Long, paths: Array<String>, trimIns: LongArray, trimOuts: LongArray): Boolean
     private external fun nativeSetMultiTrackTimeline(handle: Long, trackCount: Int, clipCounts: IntArray, allPaths: Array<String>, allTrimIns: LongArray, allTrimOuts: LongArray, overlayAlpha: Float): Boolean
     private external fun nativeSetOverlayAlpha(handle: Long, alpha: Float)
+    private external fun nativeSetSubtitle(handle: Long, srtPath: String, fontPath: String, fontSizePx: Int)
+    private external fun nativeSetSubtitleEnabled(handle: Long, enabled: Boolean)
     private external fun nativePlay(handle: Long)
     private external fun nativePause(handle: Long)
     private external fun nativeSeek(handle: Long, positionUs: Long)
