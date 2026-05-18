@@ -31,6 +31,16 @@ This is my personal playground for exploring various Android development topics.
 - Macrobenchmark + Baseline Profiles
 - Perfetto tracing
 
+## Setup
+
+Run once after cloning:
+
+```bash
+./tools/setup.sh
+```
+
+This initializes git submodules (`ffmpeg`, `freetype`) and disables push recursion so `git push` doesn't try to forward submodule commits to upstream mirrors we don't own.
+
 ## Build
 
 ```bash
