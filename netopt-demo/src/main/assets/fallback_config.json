@@ -1,0 +1,10 @@
+{
+  "source": "asset-fallback",
+  "version": "0.0.0",
+  "featureFlags": {
+    "newFeedUi": false,
+    "darkMode": true
+  },
+  "minClientVersion": "1.0.0",
+  "note": "Bundled with the APK. Used when both network and HTTP cache fail."
+}

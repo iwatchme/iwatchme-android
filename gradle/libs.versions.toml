@@ -44,6 +44,8 @@ okhttp = "4.12.0"
 atomicfu = "0.26.1"
 ktor = "3.0.3"
 skie = "0.10.11"
+wire = "5.0.0"
+brotli-dec = "0.1.2"
 
 [libraries]
 appcompat = { group = "androidx.appcompat", name = "appcompat", version.ref = "appcompat" }
@@ -116,6 +118,10 @@ ktor-client-core = { module = "io.ktor:ktor-client-core", version.ref = "ktor" }
 ktor-client-okhttp = { module = "io.ktor:ktor-client-okhttp", version.ref = "ktor" }
 ktor-client-darwin = { module = "io.ktor:ktor-client-darwin", version.ref = "ktor" }
 
+# httpopt experiment deps (Step 3)
+wire-runtime = { module = "com.squareup.wire:wire-runtime", version.ref = "wire" }
+brotli-dec = { module = "org.brotli:dec", version.ref = "brotli-dec" }
+
 [bundles]
 
 [plugins]
@@ -130,3 +136,4 @@ baselineprofile = { id = "androidx.baselineprofile", version.ref = "baselineprof
 kotlin-multiplatform = { id = "org.jetbrains.kotlin.multiplatform", version.ref = "kotlin" }
 atomicfu = { id = "org.jetbrains.kotlinx.atomicfu", version.ref = "atomicfu" }
 skie = { id = "co.touchlab.skie", version.ref = "skie" }
+wire = { id = "com.squareup.wire", version.ref = "wire" }

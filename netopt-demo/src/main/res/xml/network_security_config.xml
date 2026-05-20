@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Trust the mkcert dev root CA in addition to system roots so that the
+  netopt-demo APK can reach https://10.0.2.2:4443 (Caddy on the host Mac)
+  without manual cert install on the emulator.
+
+  Production builds must remove this — see Step 7 plan.
+-->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="true">
+        <trust-anchors>
+            <certificates src="system" />
+            <certificates src="@raw/dev_root_ca" />
+        </trust-anchors>
+    </base-config>
+</network-security-config>
