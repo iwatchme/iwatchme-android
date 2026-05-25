@@ -49,6 +49,10 @@
             android:label="Cocos Game"
             android:process=":cocos_game"
             android:theme="@style/Theme.IWatchMeAndroid" />
+
+        <!-- Shadow 插件壳子 Activity / Service / Provider 全部在 :host-shadow library manifest 里
+             声明，AGP 在 manifest merger 阶段自动合并到这里。需要调整壳子数量或属性见
+             host-shadow/src/main/AndroidManifest.xml -->
     </application>
 
 </manifest>

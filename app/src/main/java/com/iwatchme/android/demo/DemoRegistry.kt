@@ -5,6 +5,7 @@ import com.iwatchme.android.demo.cocosshell.CocosShellDemoScreen
 import com.iwatchme.android.demo.crash.CrashLibDemoScreen
 import com.iwatchme.android.demo.player.PlayerDemoScreen
 import com.iwatchme.android.demo.renderengine.RenderEngineDemoScreen
+import com.iwatchme.android.demo.shadowplugin.ShadowPluginDemoScreen
 import com.iwatchme.android.demo.thread.ThreadDetectorScreen
 import com.iwatchme.android.demo.translation.TranslationDemoScreen
 import com.iwatchme.android.demo.tts.TtsDemoScreen
@@ -92,6 +93,14 @@ object DemoRegistry {
             description = "Faithful reproduction of the Jiliguala Cocos container: :cocos_game process + Messenger IPC + URL-keyed package cache + WebView-hosted JS↔Native bridge driving the voice-eval engine.",
             content = {
                 CocosShellDemoScreen()
+            },
+        ),
+        DemoEntry(
+            route = "demo/shadow-plugin",
+            title = "Shadow Plugin Update",
+            description = "Tencent Shadow 插件分发链路：拉取 manager.apk 与插件 zip，校验 md5 后加载 Manager / Loader 并启动业务页面。",
+            content = {
+                ShadowPluginDemoScreen()
             },
         ),
     )

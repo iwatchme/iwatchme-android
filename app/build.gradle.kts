@@ -17,6 +17,8 @@ val localProps = Properties().apply {
 // pulled in by :voice-eval resolves at app-build time too.
 repositories {
     maven(url = "https://jitpack.io")
+    // 解析 :host-shadow 传递依赖的 com.tencent.shadow.* artifact，由 tools/shadow-publish.sh 发布
+    mavenLocal()
 }
 
 android {
@@ -85,6 +87,7 @@ dependencies {
     implementation(project(":player"))
     implementation(project(":voice-eval"))
     implementation(project(":cocos-shell"))
+    implementation(project(":host-shadow"))
     implementation(libs.permission)
     implementation("io.ai.sdk:ai-tts:1.0.0")
     implementation("io.ai.sdk:ai-translation:1.0.0")

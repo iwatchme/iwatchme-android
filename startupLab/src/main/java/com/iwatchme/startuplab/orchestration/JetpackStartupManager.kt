@@ -31,6 +31,7 @@ object JetpackStartupManager {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     private var session: StartupSession? = null
     private lateinit var startupMode: StartupMode
+    private var application: Application? = null
     @Volatile
     private var latestReport: StartupReport? = null
     @Volatile
@@ -38,7 +39,21 @@ object JetpackStartupManager {
     @Volatile
     private var idleDrainStarted = false
 
+    /**
+     * 业务侧注册的"首屏画完之后才跑"的 idle hook（如插件预下载、二级数据预取）。
+     * - 在 [markFullyDrawnReported] 触发 MessageQueue idle 后，跟内部 idle drain 并行执行
+     * - 单个 hook 失败仅 log，不影响其它 hook 与启动流程
+     * - 注册必须在 [markFullyDrawnReported] 之前（即 Application.onCreate 阶段）
+     */
+    private val externalIdleHooks = mutableListOf<Pair<String, suspend (Application) -> Unit>>()
+
+    @Synchronized
+    fun registerExternalIdleHook(name: String, block: suspend (Application) -> Unit) {
+        externalIdleHooks += name to block
+    }
+
     fun start(application: Application) {
+        this.application = application
         session = null
         latestReport = null
         fullyDrawnReported = false
@@ -131,7 +146,29 @@ object JetpackStartupManager {
                 StartupMode.OPTIMIZED -> startOptimizedIdleDrain()
                 StartupMode.LEGACY -> startLegacyIdleDrain()
             }
+            runExternalIdleHooks()
             false
+        }
+    }
+
+    private fun runExternalIdleHooks() {
+        val app = application ?: return
+        val hooks = synchronized(this) { externalIdleHooks.toList() }
+        if (hooks.isEmpty()) return
+        scope.launch {
+            for ((name, block) in hooks) {
+                val t0 = System.currentTimeMillis()
+                try {
+                    block(app)
+                    val cost = System.currentTimeMillis() - t0
+                    StartupDashboardStore.appendNote("External idle hook '$name' finished in ${cost}ms")
+                    StartupLog.d("External idle hook '$name' finished in ${cost}ms")
+                } catch (t: Throwable) {
+                    val cost = System.currentTimeMillis() - t0
+                    StartupDashboardStore.appendNote("External idle hook '$name' failed after ${cost}ms: ${t.javaClass.simpleName}")
+                    StartupLog.d("External idle hook '$name' failed: ${t.message}")
+                }
+            }
         }
     }
 

@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <application
+        android:hasCode="true"
+        android:label="iwatchme-plugin-demo">
+        <!-- 业务 Activity；Shadow 通过反射启动，不需要 exported -->
+        <activity android:name="com.iwatchme.plugin.demo.MemberCenterActivity" />
+        <activity
+            android:name="com.iwatchme.plugin.demo.SingleTaskProbeActivity"
+            android:launchMode="singleTask" />
+
+        <!-- 插件 Service：Shadow PluginServiceManager 拦截 startService 路由到这里。
+             不需要在 host manifest 额外声明壳子 Service —— Shadow 内部统一调度。 -->
+        <service android:name="com.iwatchme.plugin.demo.PluginDemoService" />
+
+        <!-- 插件 ContentProvider：host 已声明的 PluginContainerContentProvider 壳子会按 authority
+             把 query 路由到这里。authority 由插件自由命名。 -->
+        <provider
+            android:name="com.iwatchme.plugin.demo.PluginMemberProvider"
+            android:authorities="com.iwatchme.plugin.demo.members"
+            android:exported="false" />
+    </application>
+</manifest>

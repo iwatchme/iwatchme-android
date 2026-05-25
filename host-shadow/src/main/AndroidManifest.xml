@@ -1,0 +1,115 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Shadow 插件化所需的全部宿主组件声明都集中在这里，library manifest 会被 AGP merge 进
+  宿主 APK 的最终 manifest。:app 不需要重复声明，也不需要知道这些壳子的细节。
+
+  关键约束：
+    - 所有壳子组件 android:process=":plugin"          → 隔离到独立进程
+    - 所有壳子组件 android:taskAffinity=":plugin.task"  → 隔离到独立 task，崩溃不连累 host MainActivity
+    - android:excludeFromRecents="true"                → 插件 task 不进最近任务列表
+    - ${applicationId} 由 AGP 在 merge 时替换为宿主真实包名
+
+  调整壳子数量请同步：
+    - host-shadow/.../container/PluginDefaultProxyActivity.kt
+    - plugin-loader-app/.../IwatchmeComponentManager.kt（ComponentMapping 引用的壳子类名）
+-->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <uses-permission android:name="android.permission.INTERNET" />
+
+    <application>
+
+        <!-- standard launchMode 壳子：按需增加，对应栈里允许并发的 Activity 实例数 -->
+        <activity
+            android:name="com.iwatchme.host.shadow.container.PluginDefaultProxyActivity0"
+            android:exported="false"
+            android:launchMode="standard"
+            android:configChanges="mcc|mnc|locale|touchscreen|keyboard|keyboardHidden|navigation|screenLayout|fontScale|uiMode|orientation|screenSize|smallestScreenSize|layoutDirection"
+            android:hardwareAccelerated="true"
+            android:multiprocess="true"
+            android:process=":plugin"
+            android:taskAffinity=":plugin.task"
+            android:excludeFromRecents="true"
+            android:theme="@android:style/Theme.Translucent.NoTitleBar.Fullscreen" />
+        <activity
+            android:name="com.iwatchme.host.shadow.container.PluginDefaultProxyActivity1"
+            android:exported="false"
+            android:launchMode="standard"
+            android:configChanges="mcc|mnc|locale|touchscreen|keyboard|keyboardHidden|navigation|screenLayout|fontScale|uiMode|orientation|screenSize|smallestScreenSize|layoutDirection"
+            android:hardwareAccelerated="true"
+            android:multiprocess="true"
+            android:process=":plugin"
+            android:taskAffinity=":plugin.task"
+            android:excludeFromRecents="true"
+            android:theme="@android:style/Theme.Translucent.NoTitleBar.Fullscreen" />
+        <activity
+            android:name="com.iwatchme.host.shadow.container.PluginDefaultProxyActivity2"
+            android:exported="false"
+            android:launchMode="standard"
+            android:configChanges="mcc|mnc|locale|touchscreen|keyboard|keyboardHidden|navigation|screenLayout|fontScale|uiMode|orientation|screenSize|smallestScreenSize|layoutDirection"
+            android:multiprocess="true"
+            android:process=":plugin"
+            android:taskAffinity=":plugin.task"
+            android:excludeFromRecents="true"
+            android:theme="@android:style/Theme.Translucent.NoTitleBar.Fullscreen" />
+        <activity
+            android:name="com.iwatchme.host.shadow.container.PluginDefaultProxyActivity3"
+            android:exported="false"
+            android:launchMode="standard"
+            android:configChanges="mcc|mnc|locale|touchscreen|keyboard|keyboardHidden|navigation|screenLayout|fontScale|uiMode|orientation|screenSize|smallestScreenSize|layoutDirection"
+            android:multiprocess="true"
+            android:process=":plugin"
+            android:taskAffinity=":plugin.task"
+            android:excludeFromRecents="true"
+            android:theme="@android:style/Theme.Translucent.NoTitleBar.Fullscreen" />
+
+        <!-- singleTask launchMode 壳子 -->
+        <activity
+            android:name="com.iwatchme.host.shadow.container.PluginSingleTaskProxyActivity0"
+            android:exported="false"
+            android:launchMode="singleTask"
+            android:configChanges="mcc|mnc|locale|touchscreen|keyboard|keyboardHidden|navigation|screenLayout|fontScale|uiMode|orientation|screenSize|smallestScreenSize|layoutDirection"
+            android:multiprocess="true"
+            android:process=":plugin"
+            android:taskAffinity=":plugin.task"
+            android:excludeFromRecents="true"
+            android:theme="@android:style/Theme.Translucent.NoTitleBar.Fullscreen" />
+        <activity
+            android:name="com.iwatchme.host.shadow.container.PluginSingleTaskProxyActivity1"
+            android:exported="false"
+            android:launchMode="singleTask"
+            android:configChanges="mcc|mnc|locale|touchscreen|keyboard|keyboardHidden|navigation|screenLayout|fontScale|uiMode|orientation|screenSize|smallestScreenSize|layoutDirection"
+            android:multiprocess="true"
+            android:process=":plugin"
+            android:taskAffinity=":plugin.task"
+            android:excludeFromRecents="true"
+            android:theme="@android:style/Theme.Translucent.NoTitleBar.Fullscreen" />
+
+        <!-- singleInstance launchMode 壳子 -->
+        <activity
+            android:name="com.iwatchme.host.shadow.container.PluginSingleInstanceProxyActivity0"
+            android:exported="false"
+            android:launchMode="singleInstance"
+            android:configChanges="mcc|mnc|locale|touchscreen|keyboard|keyboardHidden|navigation|screenLayout|fontScale|uiMode|orientation|screenSize|smallestScreenSize|layoutDirection"
+            android:multiprocess="true"
+            android:process=":plugin"
+            android:taskAffinity=":plugin.task"
+            android:excludeFromRecents="true"
+            android:theme="@android:style/Theme.Translucent.NoTitleBar.Fullscreen" />
+
+        <!-- Shadow 跨进程 Service：宿主和插件进程之间走 Binder -->
+        <service
+            android:name="com.iwatchme.host.shadow.IwatchmePluginProcessService"
+            android:exported="false"
+            android:process=":plugin" />
+
+        <!-- Shadow 动态 Provider：插件 Resource 资源访问入口 -->
+        <provider
+            android:name="com.tencent.shadow.core.runtime.container.PluginContainerContentProvider"
+            android:authorities="${applicationId}.shadow.provider.dynamic"
+            android:exported="false"
+            android:grantUriPermissions="true"
+            android:process=":plugin" />
+
+    </application>
+</manifest>

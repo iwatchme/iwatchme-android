@@ -46,6 +46,8 @@ ktor = "3.0.3"
 skie = "0.10.11"
 wire = "5.0.0"
 brotli-dec = "0.1.2"
+retrofit = "2.11.0"
+tencentShadow = "local"  # vendor/Shadow 发到 mavenLocal 的版本号（PUBLISH_RELEASE=true 时固定为 'local'）
 
 [libraries]
 appcompat = { group = "androidx.appcompat", name = "appcompat", version.ref = "appcompat" }
@@ -122,6 +124,21 @@ ktor-client-darwin = { module = "io.ktor:ktor-client-darwin", version.ref = "kto
 wire-runtime = { module = "com.squareup.wire:wire-runtime", version.ref = "wire" }
 brotli-dec = { module = "org.brotli:dec", version.ref = "brotli-dec" }
 
+# Shadow 插件化（由 vendor/Shadow publish 到 mavenLocal 解析，version=local）
+tencent-shadow-core-common = { module = "com.tencent.shadow.core:common", version.ref = "tencentShadow" }
+tencent-shadow-core-runtime = { module = "com.tencent.shadow.core:runtime", version.ref = "tencentShadow" }
+tencent-shadow-core-loader = { module = "com.tencent.shadow.core:loader", version.ref = "tencentShadow" }
+tencent-shadow-core-manager = { module = "com.tencent.shadow.core:manager", version.ref = "tencentShadow" }
+tencent-shadow-core-activity-container = { module = "com.tencent.shadow.core:activity-container", version.ref = "tencentShadow" }
+tencent-shadow-dynamic-host = { module = "com.tencent.shadow.dynamic:host", version.ref = "tencentShadow" }
+tencent-shadow-dynamic-manager = { module = "com.tencent.shadow.dynamic:manager", version.ref = "tencentShadow" }
+tencent-shadow-dynamic-loader = { module = "com.tencent.shadow.dynamic:loader", version.ref = "tencentShadow" }
+tencent-shadow-dynamic-loader-impl = { module = "com.tencent.shadow.dynamic:loader-impl", version.ref = "tencentShadow" }
+
+# 插件版本 API 客户端
+retrofit-core = { group = "com.squareup.retrofit2", name = "retrofit", version.ref = "retrofit" }
+retrofit-kotlinx-serialization = { group = "com.squareup.retrofit2", name = "converter-kotlinx-serialization", version.ref = "retrofit" }
+
 [bundles]
 
 [plugins]
@@ -134,6 +151,8 @@ ksp = { id = "com.google.devtools.ksp", version = "2.0.21-1.0.28" }
 kotlin-compose = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }
 baselineprofile = { id = "androidx.baselineprofile", version.ref = "baselineprofile-plugin" }
 kotlin-multiplatform = { id = "org.jetbrains.kotlin.multiplatform", version.ref = "kotlin" }
+kotlin-serialization = { id = "org.jetbrains.kotlin.plugin.serialization", version.ref = "kotlin" }
+tencent-shadow-plugin = { id = "com.tencent.shadow.plugin", version.ref = "tencentShadow" }
 atomicfu = { id = "org.jetbrains.kotlinx.atomicfu", version.ref = "atomicfu" }
 skie = { id = "co.touchlab.skie", version.ref = "skie" }
 wire = { id = "com.squareup.wire", version.ref = "wire" }
